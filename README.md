@@ -1,7 +1,7 @@
 # ioBroker.llm-controller
 
 [![NPM version](https://img.shields.io/npm/v/iobroker.llm-controller.svg)](https://www.npmjs.com/package/iobroker.llm-controller)
-[![License](https://img.shields.io/npm/l/iobroker.llm-controller.svg)](https://github.com/alexejhorner/ioBroker.llm-controller/blob/main/LICENSE)
+[![License](https://img.shields.io/npm/l/iobroker.llm-controller.svg)](https://github.com/djlex83/ioBroker.llm-controller/blob/main/LICENSE)
 
 Steuere dein Smart Home mit natürlicher Sprache! Dieser ioBroker-Adapter nutzt Claude (Anthropic) als KI, um Sprachbefehle von Alexa zu interpretieren und in Smart-Home-Aktionen umzuwandeln.
 
