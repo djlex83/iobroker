@@ -1,0 +1,160 @@
+{
+  "common": {
+    "name": "llm-controller",
+    "version": "0.1.0",
+    "news": {
+      "0.1.0": {
+        "en": "Initial release",
+        "de": "Erstveröffentlichung"
+      }
+    },
+    "title": "LLM Controller",
+    "titleLang": {
+      "en": "LLM Controller",
+      "de": "LLM Controller"
+    },
+    "desc": {
+      "en": "Control ioBroker devices via LLM (Claude) based on Alexa voice input",
+      "de": "Steuerung von ioBroker-Geräten über LLM (Claude) basierend auf Alexa-Spracheingaben"
+    },
+    "authors": ["Alexej Horner"],
+    "keywords": ["llm", "claude", "alexa", "voice", "smart home"],
+    "license": "MIT",
+    "platform": "Javascript/Node.js",
+    "main": "main.js",
+    "icon": "llm-controller.png",
+    "enabled": true,
+    "extIcon": "https://raw.githubusercontent.com/alexejhorner/ioBroker.llm-controller/main/admin/llm-controller.png",
+    "readme": "https://github.com/alexejhorner/ioBroker.llm-controller/blob/main/README.md",
+    "loglevel": "info",
+    "mode": "daemon",
+    "type": "general",
+    "compact": true,
+    "connectionType": "cloud",
+    "dataSource": "push",
+    "adminUI": {
+      "config": "html"
+    },
+    "dependencies": [
+      {
+        "js-controller": ">=5.0.0"
+      }
+    ],
+    "globalDependencies": [
+      {
+        "admin": ">=6.0.0"
+      }
+    ]
+  },
+  "native": {
+    "apiKey": "",
+    "model": "claude-sonnet-4-20250514",
+    "alexa2Instance": "alexa2.0",
+    "allowedRooms": [],
+    "systemPrompt": "",
+    "confirmActions": false,
+    "maxTokens": 1024
+  },
+  "objects": [],
+  "instanceObjects": [
+    {
+      "_id": "info",
+      "type": "channel",
+      "common": {
+        "name": "Information"
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.connection",
+      "type": "state",
+      "common": {
+        "role": "indicator.connected",
+        "name": "Connection to Claude API",
+        "type": "boolean",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    },
+    {
+      "_id": "lastCommand",
+      "type": "state",
+      "common": {
+        "role": "text",
+        "name": "Last voice command received",
+        "type": "string",
+        "read": true,
+        "write": false,
+        "def": ""
+      },
+      "native": {}
+    },
+    {
+      "_id": "lastResponse",
+      "type": "state",
+      "common": {
+        "role": "text",
+        "name": "Last LLM response",
+        "type": "string",
+        "read": true,
+        "write": false,
+        "def": ""
+      },
+      "native": {}
+    },
+    {
+      "_id": "lastAction",
+      "type": "state",
+      "common": {
+        "role": "json",
+        "name": "Last executed action",
+        "type": "string",
+        "read": true,
+        "write": false,
+        "def": "{}"
+      },
+      "native": {}
+    },
+    {
+      "_id": "status",
+      "type": "state",
+      "common": {
+        "role": "text",
+        "name": "Adapter status",
+        "type": "string",
+        "read": true,
+        "write": false,
+        "def": "idle"
+      },
+      "native": {}
+    },
+    {
+      "_id": "manualInput",
+      "type": "state",
+      "common": {
+        "role": "text",
+        "name": "Manual text input for LLM processing",
+        "type": "string",
+        "read": true,
+        "write": true,
+        "def": ""
+      },
+      "native": {}
+    },
+    {
+      "_id": "devices",
+      "type": "state",
+      "common": {
+        "role": "json",
+        "name": "Available devices for control",
+        "type": "string",
+        "read": true,
+        "write": false,
+        "def": "[]"
+      },
+      "native": {}
+    }
+  ]
+}

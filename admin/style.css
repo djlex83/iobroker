@@ -1,0 +1,72 @@
+/* LLM Controller Admin Styles */
+
+.adapter-container {
+    padding: 20px;
+    max-width: 1200px;
+}
+
+h4 {
+    color: #1976d2;
+    border-bottom: 2px solid #1976d2;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+h5 {
+    color: #455a64;
+    margin-top: 30px;
+    margin-bottom: 15px;
+}
+
+.input-field label {
+    font-size: 1rem;
+}
+
+.helper-text {
+    font-size: 0.85rem;
+    color: #9e9e9e;
+}
+
+textarea.materialize-textarea {
+    min-height: 100px;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.card {
+    margin-top: 30px;
+}
+
+.card ol, .card ul {
+    margin-left: 20px;
+}
+
+.card li {
+    margin-bottom: 5px;
+}
+
+.card code {
+    background-color: rgba(255,255,255,0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+/* Fix for select dropdown */
+.select-wrapper input.select-dropdown {
+    margin-bottom: 0;
+}
+
+/* Responsive adjustments */
+@media only screen and (max-width: 600px) {
+    .adapter-container {
+        padding: 10px;
+    }
+
+    h4 {
+        font-size: 1.5rem;
+    }
+
+    h5 {
+        font-size: 1.2rem;
+    }
+}

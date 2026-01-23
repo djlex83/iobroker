@@ -1,0 +1,41 @@
+{
+  "name": "iobroker.llm-controller",
+  "version": "0.1.0",
+  "description": "ioBroker adapter to control devices via LLM (Claude) based on Alexa voice input",
+  "author": {
+    "name": "Alexej Horner"
+  },
+  "homepage": "https://github.com/alexejhorner/ioBroker.llm-controller",
+  "license": "MIT",
+  "keywords": [
+    "ioBroker",
+    "llm",
+    "claude",
+    "alexa",
+    "smart home",
+    "voice control"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexejhorner/ioBroker.llm-controller.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@iobroker/adapter-core": "^3.0.0"
+  },
+  "devDependencies": {},
+  "main": "main.js",
+  "files": [
+    "admin/",
+    "lib/",
+    "main.js",
+    "io-package.json"
+  ],
+  "scripts": {
+    "test": "echo \"No tests yet\"",
+    "start": "node main.js"
+  }
+}
