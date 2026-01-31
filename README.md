@@ -133,6 +133,11 @@ Alexej Horner
 
 ## Changelog
 
+### 0.3.2 (Admin UI Fix)
+- **Vereinfachtes JavaScript**: Admin UI funktioniert jetzt zuverlässig
+- **Dropdowns repariert**: Provider, Modelle und Alexa-Instanzen
+- **Logging**: Alle Events werden in ioBroker-Log UND Log-Datenpunkt geschrieben
+
 ### 0.3.1 (UI Fixes & Logging)
 - **Dropdowns gefixt**: Provider, Modelle und Alexa-Instanzen funktionieren jetzt korrekt
 - **Log-System**: Neue `log` Datenpunkt mit Verarbeitungshistorie

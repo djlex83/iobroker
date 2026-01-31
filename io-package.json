@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "llm-controller",
-    "version": "0.3.1",
+    "version": "0.3.2",
     "news": {
+      "0.3.2": {
+        "en": "Simplified admin UI JavaScript, fixed dropdown compatibility",
+        "de": "Vereinfachtes Admin UI JavaScript, Dropdown-Kompatibilität repariert"
+      },
       "0.3.1": {
         "en": "Fixed dropdowns, added detailed logging system with log state",
         "de": "Dropdowns repariert, detailliertes Log-System mit Log-Datenpunkt hinzugefügt"
