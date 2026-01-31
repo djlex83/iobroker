@@ -10,22 +10,32 @@
     <script type="text/javascript" src="../../js/translate.js"></script>
     <script type="text/javascript" src="../../js/adapter-settings.js"></script>
     <style>
-        .debug-info { background: #fff3cd; padding: 10px; margin: 10px 0; border: 1px solid #ffc107; font-family: monospace; font-size: 12px; }
-        select { display: block !important; }
+        select { 
+            display: block; 
+            width: 100%; 
+            padding: 8px; 
+            border: 1px solid #ccc; 
+            border-radius: 4px;
+            background: white;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+        select[multiple] { height: auto; min-height: 80px; }
+        .input-field { margin-bottom: 20px; }
+        label { 
+            display: block; 
+            font-weight: bold; 
+            color: #555;
+            margin-bottom: 5px;
+        }
+        h4 { color: #1976d2; border-bottom: 2px solid #1976d2; padding-bottom: 10px; }
+        h5 { color: #555; margin-top: 30px; }
     </style>
     <script type="text/javascript">
-        // DEBUG: Prüfe ob alles geladen ist
         console.log('=== ADMIN PAGE LOADED ===');
         
-        var g_onChange = null;
-        var g_settings = null;
-
         function load(settings, onChange) {
-            console.log('=== LOAD CALLED ===');
-            console.log('Settings:', JSON.stringify(settings));
-            
-            g_settings = settings;
-            g_onChange = onChange;
+            console.log('=== LOAD CALLED ===', settings);
             
             if (!settings) {
                 console.error('NO SETTINGS!');
@@ -33,15 +43,14 @@
             }
 
             try {
-                // 1. Provider setzen
+                // Provider setzen
                 var provider = settings.llmProvider || 'claude';
-                console.log('Setting provider to:', provider);
                 $('#llmProvider').val(provider);
                 
-                // 2. Models für Provider laden
+                // Models laden
                 updateModels(provider, settings.model);
                 
-                // 3. Einfache Text-Felder
+                // Text Felder
                 $('#apiKey').val(settings.apiKey || '');
                 $('#maxTokens').val(settings.maxTokens || 1024);
                 $('#commandTimeout').val(settings.commandTimeout || 30);
@@ -56,12 +65,11 @@
                     $('#triggerWords').val(settings.triggerWords.join(', '));
                 }
 
-                // 4. Alexa Instanzen laden
+                // Alexa Instanzen
                 loadAlexaInstances(settings.alexa2Instances || ['alexa2.0']);
 
-                // 5. Event Handler
-                $('#llmProvider').off('change').on('change', function() {
-                    console.log('Provider changed to:', $(this).val());
+                // Event Handler
+                $('#llmProvider').on('change', function() {
                     updateModels($(this).val());
                     onChange();
                 });
@@ -70,39 +78,17 @@
                     onChange();
                 });
 
-                // 6. Materialize initialisieren (mehrfach für Sicherheit)
-                setTimeout(function() {
-                    console.log('Initializing Materialize...');
-                    try {
-                        $('select').formSelect();
-                        console.log('formSelect done');
-                    } catch(e) {
-                        console.error('formSelect error:', e);
-                    }
-                    
-                    try {
-                        M.updateTextFields();
-                        console.log('updateTextFields done');
-                    } catch(e) {
-                        console.error('updateTextFields error:', e);
-                    }
-                    
-                    // Debug-Ausgabe nach Initialisierung
-                    console.log('Provider value after init:', $('#llmProvider').val());
-                    console.log('Model value after init:', $('#model').val());
-                }, 200);
-
                 onChange(false);
                 console.log('=== LOAD COMPLETE ===');
                 
             } catch(e) {
                 console.error('LOAD ERROR:', e);
-                $('#debugOutput').text('ERROR: ' + e.message + '\n' + e.stack);
+                alert('Fehler beim Laden: ' + e.message);
             }
         }
 
         function updateModels(provider, selectedModel) {
-            console.log('updateModels called:', provider, selectedModel);
+            console.log('updateModels:', provider, selectedModel);
             
             var models = {
                 claude: [
@@ -137,23 +123,17 @@
                 html += '</option>';
             }
             
-            console.log('Setting model HTML:', html);
             $('#model').html(html);
-            
-            // Re-initialize
-            setTimeout(function() {
-                $('#model').formSelect();
-            }, 100);
         }
 
         function loadAlexaInstances(selected) {
-            console.log('loadAlexaInstances called, selected:', selected);
+            console.log('loadAlexaInstances:', selected);
             
             socket.emit('getObjectView', 'system', 'instance', {
                 startkey: 'system.adapter.alexa2.',
                 endkey: 'system.adapter.alexa2.\u9999'
             }, function(err, res) {
-                console.log('Alexa instances response:', err, res);
+                console.log('Alexa response:', err, res);
                 
                 var html = '';
                 if (!err && res && res.rows && res.rows.length > 0) {
@@ -166,12 +146,7 @@
                     html = '<option value="alexa2.0" selected>alexa2.0</option>';
                 }
                 
-                console.log('Setting alexa HTML:', html);
                 $('#alexa2Instances').html(html);
-                
-                setTimeout(function() {
-                    $('#alexa2Instances').formSelect();
-                }, 100);
             });
         }
 
@@ -195,18 +170,13 @@
             var tw = $('#triggerWords').val();
             obj.triggerWords = tw ? tw.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; }) : [];
 
-            console.log('Saving:', JSON.stringify(obj));
+            console.log('Saving:', obj);
             callback(obj);
         }
     </script>
 </head>
 <body>
     <div class="m adapter-container">
-        <!-- Debug Output -->
-        <div id="debugOutput" class="debug-info">
-            Debug Info: Seite geladen. Warte auf Settings...
-        </div>
-
         <div class="row">
             <div class="col s12">
                 <h4>LLM Controller</h4>
@@ -221,20 +191,20 @@
 
         <div class="row">
             <div class="input-field col s12 m6">
+                <label>Provider</label>
                 <select id="llmProvider" class="value">
                     <option value="claude">Anthropic Claude</option>
                     <option value="openai">OpenAI (ChatGPT)</option>
                     <option value="gemini">Google Gemini</option>
                     <option value="kimi">Kimi (Moonshot)</option>
                 </select>
-                <label>Provider</label>
             </div>
 
             <div class="input-field col s12 m6">
+                <label>Modell</label>
                 <select id="model" class="value">
                     <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
                 </select>
-                <label>Modell</label>
             </div>
         </div>
 
@@ -246,30 +216,30 @@
 
         <div class="row">
             <div class="input-field col s12 m8">
-                <input type="password" id="apiKey" class="value">
                 <label for="apiKey">API Key</label>
+                <input type="password" id="apiKey" class="value">
             </div>
 
             <div class="input-field col s12 m4">
-                <input type="number" id="maxTokens" class="value" value="1024" min="256" max="4096">
                 <label for="maxTokens">Max Tokens</label>
+                <input type="number" id="maxTokens" class="value" value="1024" min="256" max="4096">
             </div>
         </div>
 
         <div class="row">
             <div class="input-field col s12 m4">
-                <input type="number" id="commandTimeout" class="value" value="30" min="5" max="120">
                 <label for="commandTimeout">Timeout (Sek)</label>
+                <input type="number" id="commandTimeout" class="value" value="30" min="5" max="120">
             </div>
 
             <div class="input-field col s12 m4">
-                <input type="number" id="confidenceThreshold" class="value" value="0.5" min="0" max="1" step="0.1">
                 <label for="confidenceThreshold">Min. Konfidenz</label>
+                <input type="number" id="confidenceThreshold" class="value" value="0.5" min="0" max="1" step="0.1">
             </div>
 
             <div class="input-field col s12 m4">
-                <input type="number" id="debounceMs" class="value" value="500" min="0" max="5000" step="100">
                 <label for="debounceMs">Debounce (ms)</label>
+                <input type="number" id="debounceMs" class="value" value="500" min="0" max="5000" step="100">
             </div>
         </div>
 
@@ -281,15 +251,15 @@
 
         <div class="row">
             <div class="input-field col s12 m6">
-                <select id="alexa2Instances" class="value" multiple>
+                <label>Alexa2 Instanzen (Strg+Klick für Mehrere)</label>
+                <select id="alexa2Instances" class="value" multiple size="3">
                     <option value="alexa2.0">alexa2.0</option>
                 </select>
-                <label>Alexa2 Instanzen (Strg+Klick für Mehrfachauswahl)</label>
             </div>
 
             <div class="input-field col s12 m6">
-                <input type="text" id="triggerWords" class="value">
                 <label for="triggerWords">Trigger-Wörter (kommagetrennt)</label>
+                <input type="text" id="triggerWords" class="value">
             </div>
         </div>
 
@@ -301,16 +271,16 @@
 
         <div class="row">
             <div class="input-field col s12 m4">
-                <input type="text" id="allowedRooms" class="value">
                 <label for="allowedRooms">Erlaubte Räume</label>
+                <input type="text" id="allowedRooms" class="value">
             </div>
 
             <div class="input-field col s12 m4">
-                <input type="number" id="deviceCacheMinutes" class="value" value="5" min="1" max="60">
                 <label for="deviceCacheMinutes">Cache (Min)</label>
+                <input type="number" id="deviceCacheMinutes" class="value" value="5" min="1" max="60">
             </div>
 
-            <div class="col s12 m4" style="padding-top: 25px;">
+            <div class="col s12 m4" style="padding-top: 30px;">
                 <label>
                     <input type="checkbox" id="confirmActions" class="value filled-in">
                     <span>Konfidenz bestätigen</span>
@@ -326,8 +296,8 @@
 
         <div class="row">
             <div class="input-field col s12">
-                <textarea id="systemPrompt" class="value materialize-textarea"></textarea>
                 <label for="systemPrompt">Zusätzlicher Prompt</label>
+                <textarea id="systemPrompt" class="value materialize-textarea"></textarea>
             </div>
         </div>
     </div>
