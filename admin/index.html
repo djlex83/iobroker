@@ -4,161 +4,209 @@
     <meta charset="utf-8">
     <title>LLM Controller</title>
     <link rel="stylesheet" type="text/css" href="../../lib/css/materialize.css">
-    <link rel="stylesheet" type="text/css" href="style.css">
     <script type="text/javascript" src="../../lib/js/jquery-3.2.1.min.js"></script>
     <script type="text/javascript" src="../../socket.io/socket.io.js"></script>
     <script type="text/javascript" src="../../lib/js/materialize.js"></script>
     <script type="text/javascript" src="../../js/translate.js"></script>
     <script type="text/javascript" src="../../js/adapter-settings.js"></script>
-    <script type="text/javascript" src="words.js"></script>
+    <style>
+        .debug-info { background: #fff3cd; padding: 10px; margin: 10px 0; border: 1px solid #ffc107; font-family: monospace; font-size: 12px; }
+        select { display: block !important; }
+    </style>
     <script type="text/javascript">
-        // Models for each provider
-        var MODELS = {
-            claude: [
-                ['claude-sonnet-4-20250514', 'Claude Sonnet 4'],
-                ['claude-opus-4-20250514', 'Claude Opus 4'],
-                ['claude-3-5-haiku-20241022', 'Claude 3.5 Haiku']
-            ],
-            openai: [
-                ['gpt-4o', 'GPT-4o'],
-                ['gpt-4o-mini', 'GPT-4o Mini'],
-                ['gpt-4-turbo', 'GPT-4 Turbo'],
-                ['gpt-3.5-turbo', 'GPT-3.5 Turbo']
-            ],
-            gemini: [
-                ['gemini-2.5-pro', 'Gemini 2.5 Pro'],
-                ['gemini-1.5-pro', 'Gemini 1.5 Pro'],
-                ['gemini-1.5-flash', 'Gemini 1.5 Flash']
-            ],
-            kimi: [
-                ['kimi-k2-5', 'Kimi K2.5'],
-                ['kimi-k1-5', 'Kimi K1.5']
-            ]
-        };
+        // DEBUG: Prüfe ob alles geladen ist
+        console.log('=== ADMIN PAGE LOADED ===');
+        
+        var g_onChange = null;
+        var g_settings = null;
 
         function load(settings, onChange) {
-            if (!settings) return;
-
-            // Provider
-            var provider = settings.llmProvider || 'claude';
-            document.getElementById('llmProvider').value = provider;
-
-            // Update models for this provider
-            updateModels(provider, settings.model);
-
-            // Text fields
-            document.getElementById('apiKey').value = settings.apiKey || '';
-            document.getElementById('maxTokens').value = settings.maxTokens || 1024;
-            document.getElementById('commandTimeout').value = settings.commandTimeout || 30;
-            document.getElementById('confidenceThreshold').value = settings.confidenceThreshold || 0.5;
-            document.getElementById('deviceCacheMinutes').value = settings.deviceCacheMinutes || 5;
-            document.getElementById('debounceMs').value = settings.debounceMs || 500;
-            document.getElementById('allowedRooms').value = settings.allowedRooms || '';
-            document.getElementById('systemPrompt').value = settings.systemPrompt || '';
-            document.getElementById('confirmActions').checked = settings.confirmActions || false;
+            console.log('=== LOAD CALLED ===');
+            console.log('Settings:', JSON.stringify(settings));
             
-            if (settings.triggerWords && Array.isArray(settings.triggerWords)) {
-                document.getElementById('triggerWords').value = settings.triggerWords.join(', ');
+            g_settings = settings;
+            g_onChange = onChange;
+            
+            if (!settings) {
+                console.error('NO SETTINGS!');
+                return;
             }
 
-            // Load Alexa instances
-            loadAlexa(settings.alexa2Instances || ['alexa2.0']);
+            try {
+                // 1. Provider setzen
+                var provider = settings.llmProvider || 'claude';
+                console.log('Setting provider to:', provider);
+                $('#llmProvider').val(provider);
+                
+                // 2. Models für Provider laden
+                updateModels(provider, settings.model);
+                
+                // 3. Einfache Text-Felder
+                $('#apiKey').val(settings.apiKey || '');
+                $('#maxTokens').val(settings.maxTokens || 1024);
+                $('#commandTimeout').val(settings.commandTimeout || 30);
+                $('#confidenceThreshold').val(settings.confidenceThreshold || 0.5);
+                $('#deviceCacheMinutes').val(settings.deviceCacheMinutes || 5);
+                $('#debounceMs').val(settings.debounceMs || 500);
+                $('#allowedRooms').val(settings.allowedRooms || '');
+                $('#systemPrompt').val(settings.systemPrompt || '');
+                $('#confirmActions').prop('checked', settings.confirmActions || false);
+                
+                if (settings.triggerWords && Array.isArray(settings.triggerWords)) {
+                    $('#triggerWords').val(settings.triggerWords.join(', '));
+                }
 
-            // Events
-            document.getElementById('llmProvider').onchange = function() {
-                updateModels(this.value);
-                onChange();
-            };
+                // 4. Alexa Instanzen laden
+                loadAlexaInstances(settings.alexa2Instances || ['alexa2.0']);
 
-            var inputs = document.querySelectorAll('.value');
-            for (var i = 0; i < inputs.length; i++) {
-                inputs[i].onchange = function() { onChange(); };
-                inputs[i].onkeyup = function() { onChange(); };
+                // 5. Event Handler
+                $('#llmProvider').off('change').on('change', function() {
+                    console.log('Provider changed to:', $(this).val());
+                    updateModels($(this).val());
+                    onChange();
+                });
+
+                $('.value').on('change', function() {
+                    onChange();
+                });
+
+                // 6. Materialize initialisieren (mehrfach für Sicherheit)
+                setTimeout(function() {
+                    console.log('Initializing Materialize...');
+                    try {
+                        $('select').formSelect();
+                        console.log('formSelect done');
+                    } catch(e) {
+                        console.error('formSelect error:', e);
+                    }
+                    
+                    try {
+                        M.updateTextFields();
+                        console.log('updateTextFields done');
+                    } catch(e) {
+                        console.error('updateTextFields error:', e);
+                    }
+                    
+                    // Debug-Ausgabe nach Initialisierung
+                    console.log('Provider value after init:', $('#llmProvider').val());
+                    console.log('Model value after init:', $('#model').val());
+                }, 200);
+
+                onChange(false);
+                console.log('=== LOAD COMPLETE ===');
+                
+            } catch(e) {
+                console.error('LOAD ERROR:', e);
+                $('#debugOutput').text('ERROR: ' + e.message + '\n' + e.stack);
             }
-
-            // Init Materialize
-            setTimeout(function() {
-                $('select').formSelect();
-                M.updateTextFields();
-            }, 100);
-
-            onChange(false);
         }
 
         function updateModels(provider, selectedModel) {
-            var select = document.getElementById('model');
-            var models = MODELS[provider] || MODELS.claude;
+            console.log('updateModels called:', provider, selectedModel);
+            
+            var models = {
+                claude: [
+                    {id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4'},
+                    {id: 'claude-opus-4-20250514', name: 'Claude Opus 4'},
+                    {id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku'}
+                ],
+                openai: [
+                    {id: 'gpt-4o', name: 'GPT-4o'},
+                    {id: 'gpt-4o-mini', name: 'GPT-4o Mini'},
+                    {id: 'gpt-4-turbo', name: 'GPT-4 Turbo'},
+                    {id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo'}
+                ],
+                gemini: [
+                    {id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro'},
+                    {id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro'},
+                    {id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash'}
+                ],
+                kimi: [
+                    {id: 'kimi-k2-5', name: 'Kimi K2.5'},
+                    {id: 'kimi-k1-5', name: 'Kimi K1.5'}
+                ]
+            };
+            
+            var modelList = models[provider] || models.claude;
             var html = '';
             
-            for (var i = 0; i < models.length; i++) {
-                var sel = (models[i][0] === selectedModel || (!selectedModel && i === 0)) ? ' selected' : '';
-                html += '<option value="' + models[i][0] + '"' + sel + '>' + models[i][1] + '</option>';
+            for (var i = 0; i < modelList.length; i++) {
+                var isSelected = (modelList[i].id === selectedModel) || (!selectedModel && i === 0);
+                html += '<option value="' + modelList[i].id + '"' + (isSelected ? ' selected' : '') + '>';
+                html += modelList[i].name;
+                html += '</option>';
             }
             
-            select.innerHTML = html;
+            console.log('Setting model HTML:', html);
+            $('#model').html(html);
             
-            // Re-init
+            // Re-initialize
             setTimeout(function() {
-                $(select).formSelect();
-            }, 50);
+                $('#model').formSelect();
+            }, 100);
         }
 
-        function loadAlexa(selected) {
+        function loadAlexaInstances(selected) {
+            console.log('loadAlexaInstances called, selected:', selected);
+            
             socket.emit('getObjectView', 'system', 'instance', {
                 startkey: 'system.adapter.alexa2.',
                 endkey: 'system.adapter.alexa2.\u9999'
             }, function(err, res) {
-                var select = document.getElementById('alexa2Instances');
-                var html = '';
+                console.log('Alexa instances response:', err, res);
                 
+                var html = '';
                 if (!err && res && res.rows && res.rows.length > 0) {
                     for (var i = 0; i < res.rows.length; i++) {
                         var inst = res.rows[i].id.replace('system.adapter.', '');
-                        var sel = selected.indexOf(inst) >= 0 ? ' selected' : '';
-                        html += '<option value="' + inst + '"' + sel + '>' + inst + '</option>';
+                        var isSelected = selected && selected.indexOf(inst) >= 0;
+                        html += '<option value="' + inst + '"' + (isSelected ? ' selected' : '') + '>' + inst + '</option>';
                     }
                 } else {
                     html = '<option value="alexa2.0" selected>alexa2.0</option>';
                 }
                 
-                select.innerHTML = html;
+                console.log('Setting alexa HTML:', html);
+                $('#alexa2Instances').html(html);
                 
                 setTimeout(function() {
-                    $(select).formSelect();
-                }, 50);
+                    $('#alexa2Instances').formSelect();
+                }, 100);
             });
         }
 
         function save(callback) {
+            console.log('=== SAVE CALLED ===');
+            
             var obj = {};
-            obj.llmProvider = document.getElementById('llmProvider').value;
-            obj.model = document.getElementById('model').value;
-            obj.apiKey = document.getElementById('apiKey').value;
-            obj.maxTokens = parseInt(document.getElementById('maxTokens').value) || 1024;
-            obj.commandTimeout = parseInt(document.getElementById('commandTimeout').value) || 30;
-            obj.deviceCacheMinutes = parseInt(document.getElementById('deviceCacheMinutes').value) || 5;
-            obj.debounceMs = parseInt(document.getElementById('debounceMs').value) || 500;
-            obj.confidenceThreshold = parseFloat(document.getElementById('confidenceThreshold').value) || 0.5;
-            obj.allowedRooms = document.getElementById('allowedRooms').value || '';
-            obj.systemPrompt = document.getElementById('systemPrompt').value || '';
-            obj.confirmActions = document.getElementById('confirmActions').checked;
+            obj.llmProvider = $('#llmProvider').val();
+            obj.model = $('#model').val();
+            obj.apiKey = $('#apiKey').val();
+            obj.maxTokens = parseInt($('#maxTokens').val()) || 1024;
+            obj.commandTimeout = parseInt($('#commandTimeout').val()) || 30;
+            obj.deviceCacheMinutes = parseInt($('#deviceCacheMinutes').val()) || 5;
+            obj.debounceMs = parseInt($('#debounceMs').val()) || 500;
+            obj.confidenceThreshold = parseFloat($('#confidenceThreshold').val()) || 0.5;
+            obj.allowedRooms = $('#allowedRooms').val() || '';
+            obj.systemPrompt = $('#systemPrompt').val() || '';
+            obj.confirmActions = $('#confirmActions').prop('checked');
+            obj.alexa2Instances = $('#alexa2Instances').val() || ['alexa2.0'];
             
-            var alexaOpts = document.getElementById('alexa2Instances').selectedOptions;
-            var alexaArr = [];
-            for (var i = 0; i < alexaOpts.length; i++) {
-                alexaArr.push(alexaOpts[i].value);
-            }
-            obj.alexa2Instances = alexaArr.length > 0 ? alexaArr : ['alexa2.0'];
-            
-            var tw = document.getElementById('triggerWords').value;
+            var tw = $('#triggerWords').val();
             obj.triggerWords = tw ? tw.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; }) : [];
 
+            console.log('Saving:', JSON.stringify(obj));
             callback(obj);
         }
     </script>
 </head>
 <body>
     <div class="m adapter-container">
+        <!-- Debug Output -->
+        <div id="debugOutput" class="debug-info">
+            Debug Info: Seite geladen. Warte auf Settings...
+        </div>
+
         <div class="row">
             <div class="col s12">
                 <h4>LLM Controller</h4>
@@ -174,7 +222,7 @@
         <div class="row">
             <div class="input-field col s12 m6">
                 <select id="llmProvider" class="value">
-                    <option value="claude" selected>Anthropic Claude</option>
+                    <option value="claude">Anthropic Claude</option>
                     <option value="openai">OpenAI (ChatGPT)</option>
                     <option value="gemini">Google Gemini</option>
                     <option value="kimi">Kimi (Moonshot)</option>
@@ -184,7 +232,7 @@
 
             <div class="input-field col s12 m6">
                 <select id="model" class="value">
-                    <option value="claude-sonnet-4-20250514" selected>Claude Sonnet 4</option>
+                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
                 </select>
                 <label>Modell</label>
             </div>
@@ -234,14 +282,14 @@
         <div class="row">
             <div class="input-field col s12 m6">
                 <select id="alexa2Instances" class="value" multiple>
-                    <option value="alexa2.0" selected>alexa2.0</option>
+                    <option value="alexa2.0">alexa2.0</option>
                 </select>
-                <label>Alexa2 Instanzen</label>
+                <label>Alexa2 Instanzen (Strg+Klick für Mehrfachauswahl)</label>
             </div>
 
             <div class="input-field col s12 m6">
                 <input type="text" id="triggerWords" class="value">
-                <label for="triggerWords">Trigger-Wörter</label>
+                <label for="triggerWords">Trigger-Wörter (kommagetrennt)</label>
             </div>
         </div>
 
