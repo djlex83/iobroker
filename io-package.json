@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "llm-controller",
-    "version": "0.3.7",
+    "version": "0.3.8",
     "news": {
+      "0.3.8": {
+        "en": "Hide Materialize select-wrapper, use custom layout classes",
+        "de": "Materialize select-wrapper versteckt, eigene Layout-Klassen verwendet"
+      },
       "0.3.7": {
         "en": "Fixed CSS - selects are now visible with !important display:block",
         "de": "CSS repariert - Selects sind jetzt sichtbar mit !important display:block"
