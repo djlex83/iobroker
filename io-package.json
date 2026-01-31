@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "llm-controller",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "news": {
+      "0.2.0": {
+        "en": "Multi-Alexa support, device caching, debouncing, rate limiting",
+        "de": "Multi-Alexa-Support, Geräte-Caching, Debouncing, Rate Limiting"
+      },
       "0.1.0": {
         "en": "Initial release",
         "de": "Erstveröffentlichung"
@@ -49,11 +53,18 @@
   "native": {
     "apiKey": "",
     "model": "claude-sonnet-4-20250514",
-    "alexa2Instance": "alexa2.0",
+    "alexa2Instances": ["alexa2.0"],
+    "triggerWords": [],
+    "alexa2Instances": ["alexa2.0"],
+    "triggerWords": [],
     "allowedRooms": [],
     "systemPrompt": "",
     "confirmActions": false,
-    "maxTokens": 1024
+    "maxTokens": 1024,
+    "commandTimeout": 30,
+    "deviceCacheMinutes": 5,
+    "debounceMs": 500,
+    "confidenceThreshold": 0.5
   },
   "objects": [],
   "instanceObjects": [

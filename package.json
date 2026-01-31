@@ -1,6 +1,6 @@
 {
   "name": "iobroker.llm-controller",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ioBroker adapter to control devices via LLM (Claude) based on Alexa voice input",
   "author": {
     "name": "Alexej Horner"

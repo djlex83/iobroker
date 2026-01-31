@@ -16,8 +16,22 @@ class LlmController extends utils.Adapter {
         this.claudeClient = null;
         this.objectController = null;
         this.intentParser = null;
-        this.lastHistoryTimestamp = 0;
+        
+        // Multi-Alexa support: Map to track last timestamp per instance
+        this.lastHistoryTimestamps = new Map();
+        
+        // Command processing state
         this.processingCommand = false;
+        this.commandQueue = [];
+        
+        // Debouncing
+        this.debounceTimer = null;
+        this.lastCommandText = null;
+        this.lastCommandTime = 0;
+        
+        // Rate limiting
+        this.lastApiCall = 0;
+        this.apiCallQueue = [];
 
         this.on('ready', this.onReady.bind(this));
         this.on('stateChange', this.onStateChange.bind(this));
@@ -32,6 +46,7 @@ class LlmController extends utils.Adapter {
 
         // Initialize components
         this.intentParser = new IntentParser(this.log);
+        this.intentParser.setConfidenceThreshold(this.config.confidenceThreshold || 0.5);
         this.objectController = new ObjectController(this, this.log);
 
         // Check API key configuration
@@ -72,17 +87,28 @@ class LlmController extends utils.Adapter {
             return;
         }
 
-        // Discover devices
+        // Configure object controller caching
+        const cacheMinutes = this.config.deviceCacheMinutes || 5;
+        this.objectController.setCacheDuration(cacheMinutes * 60 * 1000);
+
+        // Initial device discovery
         await this.discoverAndStoreDevices();
 
-        // Subscribe to Alexa2 history
-        await this.subscribeToAlexa();
+        // Subscribe to multiple Alexa2 instances
+        await this.subscribeToAlexaInstances();
 
         // Subscribe to manual input state
         await this.subscribeStatesAsync('manualInput');
 
+        // Schedule periodic device refresh
+        this.scheduleDeviceRefresh();
+
         await this.setStateAsync('status', 'ready', true);
         this.log.info('LLM Controller Adapter bereit');
+        
+        // Log configuration
+        const instances = this.config.alexa2Instances || ['alexa2.0'];
+        this.log.info(`Überwache ${instances.length} Alexa2-Instanz(en): ${instances.join(', ')}`);
     }
 
     /**
@@ -105,11 +131,39 @@ class LlmController extends utils.Adapter {
     }
 
     /**
-     * Subscribe to Alexa2 adapter history
+     * Schedule periodic device refresh
      */
-    async subscribeToAlexa() {
-        const alexa2Instance = this.config.alexa2Instance || 'alexa2.0';
-        const historyState = `${alexa2Instance}.History.json`;
+    scheduleDeviceRefresh() {
+        const cacheMinutes = this.config.deviceCacheMinutes || 5;
+        const intervalMs = cacheMinutes * 60 * 1000;
+        
+        this.deviceRefreshInterval = setInterval(async () => {
+            this.log.debug('Aktualisiere Geräteliste (Cache-Refresh)...');
+            await this.discoverAndStoreDevices();
+        }, intervalMs);
+    }
+
+    /**
+     * Subscribe to multiple Alexa2 adapter instances
+     */
+    async subscribeToAlexaInstances() {
+        const instances = this.config.alexa2Instances || ['alexa2.0'];
+        
+        if (!Array.isArray(instances) || instances.length === 0) {
+            this.log.warn('Keine Alexa2-Instanzen konfiguriert');
+            return;
+        }
+
+        for (const instance of instances) {
+            await this.subscribeToAlexaInstance(instance.trim());
+        }
+    }
+
+    /**
+     * Subscribe to a single Alexa2 instance
+     */
+    async subscribeToAlexaInstance(instance) {
+        const historyState = `${instance}.History.json`;
 
         this.log.info(`Subscribing to Alexa2 History: ${historyState}`);
 
@@ -118,15 +172,14 @@ class LlmController extends utils.Adapter {
             const obj = await this.getForeignObjectAsync(historyState);
             if (!obj) {
                 this.log.warn(`Alexa2 History State nicht gefunden: ${historyState}`);
-                this.log.warn('Stelle sicher, dass der Alexa2 Adapter installiert und konfiguriert ist.');
                 return;
             }
 
             await this.subscribeForeignStatesAsync(historyState);
-            this.log.info('Alexa2 History Subscription aktiv');
+            this.log.info(`Alexa2 History Subscription aktiv für ${instance}`);
 
         } catch (error) {
-            this.log.error(`Fehler beim Subscriben auf Alexa2: ${error.message}`);
+            this.log.error(`Fehler beim Subscriben auf ${instance}: ${error.message}`);
         }
     }
 
@@ -140,69 +193,150 @@ class LlmController extends utils.Adapter {
         if (id.endsWith('.manualInput')) {
             const command = state.val;
             if (command && typeof command === 'string' && command.trim()) {
-                await this.processCommand(command.trim(), 'manual');
+                await this.queueCommand(command.trim(), 'manual');
                 // Clear the input after processing
                 await this.setStateAsync('manualInput', '', true);
             }
             return;
         }
 
-        // Handle Alexa2 history
+        // Handle Alexa2 history from any instance
         if (id.includes('History.json')) {
-            await this.handleAlexaHistory(state.val);
+            await this.handleAlexaHistory(id, state.val);
         }
     }
 
     /**
-     * Handle Alexa2 history updates
+     * Handle Alexa2 history updates with debouncing
      */
-    async handleAlexaHistory(historyValue) {
+    async handleAlexaHistory(stateId, historyValue) {
         if (!historyValue) return;
 
         const parsed = this.intentParser.parseAlexaHistory(historyValue);
         if (!parsed) return;
 
-        // Avoid processing the same command twice
-        if (parsed.timestamp <= this.lastHistoryTimestamp) {
+        // Get instance name from state ID
+        const instanceMatch = stateId.match(/^(alexa2\.\d+)\.History\.json$/);
+        const instance = instanceMatch ? instanceMatch[1] : 'unknown';
+
+        // Avoid processing the same command twice (per instance)
+        const lastTimestamp = this.lastHistoryTimestamps.get(instance) || 0;
+        if (parsed.timestamp <= lastTimestamp) {
             return;
         }
-        this.lastHistoryTimestamp = parsed.timestamp;
+        this.lastHistoryTimestamps.set(instance, parsed.timestamp);
 
         const command = parsed.text;
-        this.log.debug(`Alexa Befehl empfangen: "${command}"`);
+        this.log.debug(`Alexa Befehl empfangen von ${instance}: "${command}"`);
 
-        // Check if command should be processed
-        if (!this.intentParser.shouldProcessCommand(command)) {
-            this.log.debug(`Befehl ignoriert (kein Smart-Home Befehl): "${command}"`);
+        // Check trigger words if configured
+        const triggerWords = this.config.triggerWords || [];
+        if (!this.intentParser.shouldProcessCommand(command, triggerWords)) {
+            this.log.debug(`Befehl ignoriert (kein Trigger-Wort): "${command}"`);
             return;
         }
 
-        await this.processCommand(command, 'alexa');
+        // Apply debouncing
+        const debounceMs = this.config.debounceMs || 500;
+        const now = Date.now();
+        
+        if (this.lastCommandText === command && (now - this.lastCommandTime) < debounceMs) {
+            this.log.debug(`Befehl debounced: "${command}"`);
+            return;
+        }
+
+        this.lastCommandText = command;
+        this.lastCommandTime = now;
+
+        // Clear existing debounce timer
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+        }
+
+        // Queue command with debounce
+        this.debounceTimer = setTimeout(() => {
+            this.queueCommand(command, 'alexa', instance);
+        }, debounceMs);
     }
 
     /**
-     * Process a voice/text command
+     * Queue a command for processing
      */
-    async processCommand(command, source = 'unknown') {
-        // Prevent concurrent processing
-        if (this.processingCommand) {
-            this.log.debug('Bereits ein Befehl in Bearbeitung, warte...');
+    async queueCommand(command, source, instance = null) {
+        const commandObj = {
+            command,
+            source,
+            instance,
+            timestamp: Date.now()
+        };
+
+        this.commandQueue.push(commandObj);
+        this.log.debug(`Befehl zur Queue hinzugefügt (${this.commandQueue.length} in Queue)`);
+
+        // Process queue
+        await this.processCommandQueue();
+    }
+
+    /**
+     * Process queued commands sequentially
+     */
+    async processCommandQueue() {
+        if (this.processingCommand || this.commandQueue.length === 0) {
             return;
         }
 
         this.processingCommand = true;
+
+        while (this.commandQueue.length > 0) {
+            const cmd = this.commandQueue.shift();
+            
+            try {
+                await this.processCommand(cmd);
+            } catch (error) {
+                this.log.error(`Fehler bei Befehlsverarbeitung: ${error.message}`);
+            }
+
+            // Small delay between commands to avoid rate limiting
+            if (this.commandQueue.length > 0) {
+                await this.sleep(100);
+            }
+        }
+
+        this.processingCommand = false;
+    }
+
+    /**
+     * Sleep helper
+     */
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    /**
+     * Process a voice/text command with rate limiting
+     */
+    async processCommand(cmdObj) {
+        const { command, source, instance } = cmdObj;
+        const timeoutSeconds = this.config.commandTimeout || 30;
+
         await this.setStateAsync('status', 'processing', true);
 
         try {
-            this.log.info(`Verarbeite Befehl (${source}): "${command}"`);
+            this.log.info(`Verarbeite Befehl (${source}${instance ? '/' + instance : ''}): "${command}"`);
             await this.setStateAsync('lastCommand', command, true);
 
-            // Refresh device values before processing
-            await this.objectController.refreshDeviceValues();
-            const devices = this.objectController.getDevices();
+            // Rate limiting for Claude API
+            await this.applyRateLimit();
 
-            // Analyze with Claude
-            const result = await this.claudeClient.analyzeCommand(command, devices);
+            // Get devices (from cache if available)
+            const devices = await this.objectController.getDevicesWithCache();
+
+            // Analyze with Claude (with timeout)
+            const result = await this.withTimeout(
+                this.claudeClient.analyzeCommand(command, devices),
+                timeoutSeconds * 1000,
+                'Claude Analyse-Timeout'
+            );
 
             if (!result.success) {
                 this.log.error(`LLM Analyse fehlgeschlagen: ${result.error}`);
@@ -260,18 +394,36 @@ class LlmController extends utils.Adapter {
         } catch (error) {
             this.log.error(`Fehler bei Befehlsverarbeitung: ${error.message}`);
             await this.setStateAsync('status', `error: ${error.message}`, true);
-
-        } finally {
-            this.processingCommand = false;
-
-            // Reset status after delay
-            setTimeout(async () => {
-                const currentStatus = await this.getStateAsync('status');
-                if (currentStatus && !currentStatus.val.includes('error')) {
-                    await this.setStateAsync('status', 'ready', true);
-                }
-            }, 5000);
         }
+    }
+
+    /**
+     * Apply rate limiting for API calls
+     */
+    async applyRateLimit() {
+        const minInterval = 500; // Minimum 500ms between API calls
+        const now = Date.now();
+        const timeSinceLastCall = now - this.lastApiCall;
+
+        if (timeSinceLastCall < minInterval) {
+            const waitTime = minInterval - timeSinceLastCall;
+            this.log.debug(`Rate limiting: Warte ${waitTime}ms...`);
+            await this.sleep(waitTime);
+        }
+
+        this.lastApiCall = Date.now();
+    }
+
+    /**
+     * Execute promise with timeout
+     */
+    async withTimeout(promise, timeoutMs, errorMessage) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+            )
+        ]);
     }
 
     /**
@@ -280,6 +432,15 @@ class LlmController extends utils.Adapter {
     onUnload(callback) {
         try {
             this.log.info('LLM Controller Adapter wird beendet');
+
+            // Clear intervals and timers
+            if (this.deviceRefreshInterval) {
+                clearInterval(this.deviceRefreshInterval);
+            }
+            if (this.debounceTimer) {
+                clearTimeout(this.debounceTimer);
+            }
+
             callback();
         } catch {
             callback();

@@ -8,11 +8,14 @@ Steuere dein Smart Home mit natürlicher Sprache! Dieser ioBroker-Adapter nutzt 
 ## Features
 
 - **Natürliche Sprachverarbeitung**: Versteht komplexe Befehle wie "Mach das Licht im Wohnzimmer etwas dunkler"
-- **Alexa-Integration**: Empfängt Sprachbefehle über den Alexa2-Adapter
-- **Automatische Geräteerkennung**: Findet automatisch steuerbare Geräte in ioBroker
+- **Multi-Alexa-Integration**: Unterstützt mehrere Alexa2-Adapter-Instanzen gleichzeitig
+- **Automatische Geräteerkennung**: Findet automatisch steuerbare Geräte in ioBroker (mit Caching)
 - **Raumbasierte Steuerung**: Unterstützt Raum-Kontext für präzisere Befehle
 - **Manuelle Eingabe**: Befehle können auch manuell per Datenpunkt gesendet werden
 - **Konfigurierbares LLM**: Wahl zwischen verschiedenen Claude-Modellen
+- **Trigger-Wörter**: Filtere Alexa-Befehle nach bestimmten Schlüsselwörtern
+- **Debouncing**: Verhindert doppelte Verarbeitung schneller Befehle
+- **Rate Limiting**: Schützt vor API-Überlastung
 
 ## Voraussetzungen
 
@@ -40,11 +43,15 @@ iobroker add llm-controller
 |-------------|--------------|
 | **API Key** | Dein Anthropic API Key (erforderlich) |
 | **Modell** | Claude-Modell (Standard: claude-sonnet-4-20250514) |
-| **Alexa2 Instanz** | Name der Alexa2-Adapter-Instanz (Standard: alexa2.0) |
-| **Erlaubte Räume** | Optional: Beschränke Steuerung auf bestimmte Räume |
-| **System Prompt** | Optional: Eigener System-Prompt für Claude |
-| **Aktionen bestätigen** | Bei niedriger Konfidenz Bestätigung anfordern |
 | **Max Tokens** | Maximale Tokens für Claude-Antwort (Standard: 1024) |
+| **Befehls-Timeout** | Maximale Zeit für Befehlsverarbeitung in Sekunden (Standard: 30) |
+| **Alexa2 Instanzen** | Mehrere Alexa2-Adapter-Instanzen auswählbar |
+| **Trigger-Wörter** | Nur Befehle mit diesen Wörtern verarbeiten (optional) |
+| **Erlaubte Räume** | Optional: Beschränke Steuerung auf bestimmte Räume |
+| **Geräte-Cache** | Minuten zwischen Geräte-Updates (Standard: 5) |
+| **Debounce** | Verzögerung für schnelle Befehle in ms (Standard: 500) |
+| **Aktionen bestätigen** | Bei niedriger Konfidenz Bestätigung anfordern |
+| **System Prompt** | Optional: Eigener System-Prompt für Claude |
 
 ## Verwendung
 
@@ -115,6 +122,14 @@ MIT License - siehe [LICENSE](LICENSE)
 Alexej Horner
 
 ## Changelog
+
+### 0.2.0 (Optimierungen)
+- **Multi-Alexa-Support**: Mehrere Alexa2-Instanzen gleichzeitig überwachen
+- **Device Discovery Caching**: Bessere Performance durch gecachte Geräteliste
+- **Debouncing**: Verhindert doppelte Befehlsverarbeitung
+- **Rate Limiting**: Schützt vor API-Überlastung
+- **Trigger-Wörter**: Filterbare Alexa-Befehle
+- **Befehls-Timeout**: Konfigurierbare Timeout für Claude-Anfragen
 
 ### 0.1.0 (Initial Release)
 - Erste Version mit Claude-Integration

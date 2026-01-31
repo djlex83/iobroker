@@ -13,6 +13,7 @@
     <script type="text/javascript" src="words.js"></script>
     <script type="text/javascript">
         let secret;
+        let alexaInstances = [];
 
         // This will be called by the admin adapter when the settings page is loaded
         function load(settings, onChange) {
@@ -41,13 +42,41 @@
             // Initialize select
             $('select').formSelect();
 
-            // Handle rooms (comma-separated string to array)
-            if (settings.allowedRooms && Array.isArray(settings.allowedRooms)) {
-                $('#allowedRooms').val(settings.allowedRooms.join(', '));
+            // Load Alexa2 instances
+            loadAlexaInstances(settings.alexa2Instances || ['alexa2.0']);
+
+            // Handle trigger words
+            if (settings.triggerWords && Array.isArray(settings.triggerWords)) {
+                $('#triggerWords').val(settings.triggerWords.join(', '));
             }
 
             onChange(false);
             M.updateTextFields();
+        }
+
+        // Load available Alexa2 instances
+        function loadAlexaInstances(selectedInstances) {
+            socket.emit('getObjectView', 'system', 'instance', { startkey: 'system.adapter.alexa2.', endkey: 'system.adapter.alexa2.\u9999' }, function (err, res) {
+                if (!err && res) {
+                    alexaInstances = [];
+                    const $select = $('#alexa2Instances');
+                    $select.empty();
+
+                    res.rows.forEach(function (row) {
+                        const instance = row.id.replace('system.adapter.', '');
+                        alexaInstances.push(instance);
+                        const isSelected = selectedInstances.includes(instance);
+                        $select.append('<option value="' + instance + '"' + (isSelected ? ' selected' : '') + '>' + instance + '</option>');
+                    });
+
+                    // If no alexa2 found, add a placeholder
+                    if (alexaInstances.length === 0) {
+                        $select.append('<option value="alexa2.0" selected>alexa2.0 (nicht installiert)</option>');
+                    }
+
+                    $select.formSelect();
+                }
+            });
         }
 
         // This will be called by the admin adapter when settings should be saved
@@ -60,7 +89,11 @@
 
                 if ($this.attr('type') === 'checkbox') {
                     obj[id] = $this.prop('checked');
-                } else if (id === 'allowedRooms') {
+                } else if (id === 'alexa2Instances') {
+                    // Get selected options from multi-select
+                    const selected = $this.val() || [];
+                    obj[id] = selected;
+                } else if (id === 'triggerWords') {
                     // Convert comma-separated string to array
                     const value = $this.val();
                     obj[id] = value ? value.split(',').map(s => s.trim()).filter(s => s) : [];
@@ -115,6 +148,11 @@
                 <label for="maxTokens" class="translate">Max Tokens</label>
                 <span class="helper-text">Maximale Antwortlänge (256-4096)</span>
             </div>
+            <div class="input-field col s12 m6">
+                <input type="number" id="commandTimeout" class="value" value="30" min="5" max="120">
+                <label for="commandTimeout" class="translate">Befehls-Timeout (Sekunden)</label>
+                <span class="helper-text">Maximale Zeit für Befehlsverarbeitung</span>
+            </div>
         </div>
 
         <!-- Alexa Configuration -->
@@ -126,9 +164,17 @@
 
         <div class="row">
             <div class="input-field col s12 m6">
-                <input type="text" id="alexa2Instance" class="value" value="alexa2.0">
-                <label for="alexa2Instance" class="translate">Alexa2 Adapter Instanz</label>
-                <span class="helper-text">z.B. alexa2.0 oder alexa2.1</span>
+                <select id="alexa2Instances" class="value" multiple>
+                    <option value="alexa2.0" selected>alexa2.0</option>
+                </select>
+                <label class="translate">Alexa2 Adapter Instanzen</label>
+                <span class="helper-text">Mehrere Instanzen mit Strg/Cmd auswählen</span>
+            </div>
+
+            <div class="input-field col s12 m6">
+                <input type="text" id="triggerWords" class="value">
+                <label for="triggerWords" class="translate">Trigger-Wörter (kommagetrennt)</label>
+                <span class="helper-text">z.B.: "Computer, Haus, Smart Home" (leer = alle Befehle)</span>
             </div>
         </div>
 
@@ -151,6 +197,19 @@
                     <input type="checkbox" id="confirmActions" class="value filled-in">
                     <span class="translate">Aktionen mit niedriger Konfidenz bestätigen</span>
                 </label>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="input-field col s12 m6">
+                <input type="number" id="deviceCacheMinutes" class="value" value="5" min="1" max="60">
+                <label for="deviceCacheMinutes" class="translate">Geräte-Cache (Minuten)</label>
+                <span class="helper-text">Wie oft Geräteliste aktualisiert wird</span>
+            </div>
+            <div class="input-field col s12 m6">
+                <input type="number" id="debounceMs" class="value" value="500" min="0" max="5000" step="100">
+                <label for="debounceMs" class="translate">Debounce (Millisekunden)</label>
+                <span class="helper-text">Verzögerung für schnelle Befehle</span>
             </div>
         </div>
 
@@ -180,7 +239,7 @@
                         <span class="card-title">Hilfe</span>
                         <p><strong>So funktioniert der Adapter:</strong></p>
                         <ol>
-                            <li>Spracheingaben vom Alexa2 Adapter werden empfangen</li>
+                            <li>Spracheingaben von allen konfigurierten Alexa2 Instanzen werden empfangen</li>
                             <li>Claude analysiert den Befehl und erkennt die Absicht</li>
                             <li>Das entsprechende ioBroker-Objekt wird gesteuert</li>
                         </ol>
@@ -190,6 +249,8 @@
                             <li>"Stelle die Heizung auf 22 Grad"</li>
                             <li>"Dimme die Lampe auf 50 Prozent"</li>
                         </ul>
+                        <p><strong>Mehrere Alexa-Instanzen:</strong></p>
+                        <p>Halte Strg (Windows) oder Cmd (Mac) gedrückt, um mehrere Instanzen auszuwählen.</p>
                         <p><strong>Manueller Input:</strong></p>
                         <p>Schreibe in den State <code>llm-controller.0.manualInput</code> um Befehle direkt zu senden.</p>
                     </div>
