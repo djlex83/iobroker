@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "llm-controller",
-    "version": "0.3.9",
+    "version": "0.4.0",
     "news": {
+      "0.4.0": {
+        "en": "Fixed toLowerCase error when device.room is not a string",
+        "de": "toLowerCase Fehler repariert wenn device.room kein String ist"
+      },
       "0.3.9": {
         "en": "Fixed model update when provider changes - using addEventListener",
         "de": "Modell-Aktualisierung bei Provider-Wechsel repariert - verwendet addEventListener"
