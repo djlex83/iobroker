@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "llm-controller",
-    "version": "0.3.3",
+    "version": "0.3.4",
     "news": {
+      "0.3.4": {
+        "en": "Fixed dropdown initialization with setTimeout and native JS",
+        "de": "Dropdown-Initialisierung mit setTimeout und nativem JS repariert"
+      },
       "0.3.3": {
         "en": "Fixed empty dropdowns - using innerHTML instead of jQuery append",
         "de": "Leere Dropdowns repariert - verwendet innerHTML statt jQuery append"
