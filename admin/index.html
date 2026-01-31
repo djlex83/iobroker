@@ -10,65 +10,69 @@
     <script type="text/javascript" src="../../js/translate.js"></script>
     <script type="text/javascript" src="../../js/adapter-settings.js"></script>
     <style>
-        /* RADIKAL: Alle Selects sichtbar machen */
         select.value {
             display: inline-block !important;
             visibility: visible !important;
             opacity: 1 !important;
-            position: static !important;
             width: 100%;
             height: 35px;
             margin: 5px 0;
-            border: 2px solid #333 !important;
-            background: #fff !important;
-            color: #000 !important;
+            border: 2px solid #333;
+            background: #fff;
             font-size: 14px;
-            z-index: 1000;
         }
-        
-        /* Versteckte Original-Materialize Elemente */
         .select-wrapper { display: none !important; }
-        
-        /* Eigene Layout-Stile */
         .my-row { margin-bottom: 15px; overflow: hidden; }
         .my-col-6 { float: left; width: 48%; margin-right: 2%; }
         .my-col-4 { float: left; width: 31%; margin-right: 2%; }
         .my-col-12 { width: 100%; }
-        
-        label { 
-            display: block; 
-            font-weight: bold; 
-            margin-bottom: 5px;
-            color: #333;
-        }
-        
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #333; }
         input.value, textarea.value {
             width: 100%;
             padding: 8px;
             border: 1px solid #ccc;
             margin-bottom: 10px;
         }
-        
         h4 { color: #1976d2; border-bottom: 2px solid #1976d2; padding-bottom: 10px; }
         h5 { color: #555; margin-top: 20px; }
-        
-        .checkbox-label {
-            display: inline;
-            font-weight: normal;
-        }
+        .checkbox-label { display: inline; font-weight: normal; }
     </style>
     <script type="text/javascript">
+        // Model definitions
+        var MODELS = {
+            claude: [
+                ['claude-sonnet-4-20250514', 'Claude Sonnet 4'],
+                ['claude-opus-4-20250514', 'Claude Opus 4'],
+                ['claude-3-5-haiku-20241022', 'Claude 3.5 Haiku']
+            ],
+            openai: [
+                ['gpt-4o', 'GPT-4o'],
+                ['gpt-4o-mini', 'GPT-4o Mini'],
+                ['gpt-4-turbo', 'GPT-4 Turbo'],
+                ['gpt-3.5-turbo', 'GPT-3.5 Turbo']
+            ],
+            gemini: [
+                ['gemini-2.5-pro', 'Gemini 2.5 Pro'],
+                ['gemini-1.5-pro', 'Gemini 1.5 Pro'],
+                ['gemini-1.5-flash', 'Gemini 1.5 Flash']
+            ],
+            kimi: [
+                ['kimi-k2-5', 'Kimi K2.5'],
+                ['kimi-k1-5', 'Kimi K1.5']
+            ]
+        };
+
         function load(settings, onChange) {
             if (!settings) return;
 
-            // Provider
+            // Set provider
             var provider = settings.llmProvider || 'claude';
             document.getElementById('llmProvider').value = provider;
             
-            // Models
+            // Set models for provider
             updateModels(provider, settings.model);
             
-            // Text Felder
+            // Text fields
             document.getElementById('apiKey').value = settings.apiKey || '';
             document.getElementById('maxTokens').value = settings.maxTokens || 1024;
             document.getElementById('commandTimeout').value = settings.commandTimeout || 30;
@@ -83,44 +87,51 @@
                 document.getElementById('triggerWords').value = settings.triggerWords.join(', ');
             }
 
-            // Alexa
+            // Load Alexa instances
             loadAlexaInstances(settings.alexa2Instances || ['alexa2.0']);
 
-            // Events
-            document.getElementById('llmProvider').onchange = function() {
+            // IMPORTANT: Bind change event to provider
+            document.getElementById('llmProvider').addEventListener('change', function() {
+                console.log('Provider changed to:', this.value);
                 updateModels(this.value);
                 onChange();
-            };
+            });
 
+            // Bind change to all inputs
             var inputs = document.querySelectorAll('.value');
             for (var i = 0; i < inputs.length; i++) {
-                inputs[i].onchange = function() { onChange(); };
+                inputs[i].addEventListener('change', function() { onChange(); });
             }
 
             onChange(false);
         }
 
         function updateModels(provider, selectedModel) {
-            var models = {
-                claude: [['claude-sonnet-4-20250514','Claude Sonnet 4'],['claude-opus-4-20250514','Claude Opus 4'],['claude-3-5-haiku-20241022','Claude 3.5 Haiku']],
-                openai: [['gpt-4o','GPT-4o'],['gpt-4o-mini','GPT-4o Mini'],['gpt-4-turbo','GPT-4 Turbo'],['gpt-3.5-turbo','GPT-3.5 Turbo']],
-                gemini: [['gemini-2.5-pro','Gemini 2.5 Pro'],['gemini-1.5-pro','Gemini 1.5 Pro'],['gemini-1.5-flash','Gemini 1.5 Flash']],
-                kimi: [['kimi-k2-5','Kimi K2.5'],['kimi-k1-5','Kimi K1.5']]
-            };
+            console.log('updateModels called with:', provider, selectedModel);
             
-            var modelList = models[provider] || models.claude;
+            var modelList = MODELS[provider] || MODELS.claude;
             var select = document.getElementById('model');
+            
+            // Clear current options
             select.innerHTML = '';
             
+            // Add new options
             for (var i = 0; i < modelList.length; i++) {
-                var opt = document.createElement('option');
-                opt.value = modelList[i][0];
-                opt.text = modelList[i][1];
-                if ((modelList[i][0] === selectedModel) || (!selectedModel && i === 0)) {
-                    opt.selected = true;
+                var option = document.createElement('option');
+                option.value = modelList[i][0];
+                option.text = modelList[i][1];
+                
+                // Select if matches or if first and no selection
+                if (selectedModel && modelList[i][0] === selectedModel) {
+                    option.selected = true;
+                } else if (!selectedModel && i === 0) {
+                    option.selected = true;
                 }
-                select.appendChild(opt);
+                
+                select.appendChild(option);
             }
+            
+            console.log('Models updated, count:', modelList.length);
         }
 
         function loadAlexaInstances(selected) {
@@ -134,18 +145,18 @@
                 if (!err && res && res.rows && res.rows.length > 0) {
                     for (var i = 0; i < res.rows.length; i++) {
                         var inst = res.rows[i].id.replace('system.adapter.', '');
-                        var opt = document.createElement('option');
-                        opt.value = inst;
-                        opt.text = inst;
-                        if (selected && selected.indexOf(inst) >= 0) opt.selected = true;
-                        select.appendChild(opt);
+                        var option = document.createElement('option');
+                        option.value = inst;
+                        option.text = inst;
+                        if (selected && selected.indexOf(inst) >= 0) option.selected = true;
+                        select.appendChild(option);
                     }
                 } else {
-                    var opt = document.createElement('option');
-                    opt.value = 'alexa2.0';
-                    opt.text = 'alexa2.0';
-                    opt.selected = true;
-                    select.appendChild(opt);
+                    var option = document.createElement('option');
+                    option.value = 'alexa2.0';
+                    option.text = 'alexa2.0';
+                    option.selected = true;
+                    select.appendChild(option);
                 }
             });
         }
@@ -195,9 +206,7 @@
             </div>
             <div class="my-col-6">
                 <label for="model">Modell</label>
-                <select id="model" class="value">
-                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-                </select>
+                <select id="model" class="value"></select>
             </div>
         </div>
 
