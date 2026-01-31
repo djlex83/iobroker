@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "llm-controller",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "news": {
+      "0.3.3": {
+        "en": "Fixed empty dropdowns - using innerHTML instead of jQuery append",
+        "de": "Leere Dropdowns repariert - verwendet innerHTML statt jQuery append"
+      },
       "0.3.2": {
         "en": "Simplified admin UI JavaScript, fixed dropdown compatibility",
         "de": "Vereinfachtes Admin UI JavaScript, Dropdown-Kompatibilität repariert"
