@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "llm-controller",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "news": {
+      "0.3.1": {
+        "en": "Fixed dropdowns, added detailed logging system with log state",
+        "de": "Dropdowns repariert, detailliertes Log-System mit Log-Datenpunkt hinzugefügt"
+      },
       "0.3.0": {
         "en": "Multi-LLM support: Claude, ChatGPT, Gemini, Kimi selectable via dropdown",
         "de": "Multi-LLM Unterstützung: Claude, ChatGPT, Gemini, Kimi per Dropdown wählbar"
@@ -169,6 +173,38 @@
         "read": true,
         "write": false,
         "def": "[]"
+      },
+      "native": {}
+    },
+    {
+      "_id": "log",
+      "type": "state",
+      "common": {
+        "role": "json",
+        "name": "Processing log for debugging",
+        "type": "string",
+        "read": true,
+        "write": true,
+        "def": "[]"
+      },
+      "native": {}
+    },
+    {
+      "_id": "logLevel",
+      "type": "state",
+      "common": {
+        "role": "level",
+        "name": "Log detail level",
+        "type": "string",
+        "read": true,
+        "write": true,
+        "states": {
+          "error": "Error only",
+          "warn": "Warnings",
+          "info": "Info",
+          "debug": "Debug (detailed)"
+        },
+        "def": "info"
       },
       "native": {}
     }

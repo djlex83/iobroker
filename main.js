@@ -16,6 +16,8 @@ class LlmController extends utils.Adapter {
         this.llmClient = null;
         this.objectController = null;
         this.intentParser = null;
+        this.logBuffer = [];
+        this.maxLogEntries = 100;
         
         // Multi-Alexa support: Map to track last timestamp per instance
         this.lastHistoryTimestamps = new Map();
@@ -39,15 +41,51 @@ class LlmController extends utils.Adapter {
     }
 
     /**
+     * Add entry to processing log
+     */
+    async addLogEntry(level, message, data = null) {
+        const timestamp = new Date().toISOString();
+        const entry = {
+            timestamp,
+            level,
+            message,
+            data
+        };
+        
+        this.logBuffer.push(entry);
+        
+        // Keep only last N entries
+        if (this.logBuffer.length > this.maxLogEntries) {
+            this.logBuffer.shift();
+        }
+        
+        // Update log state
+        try {
+            await this.setStateAsync('log', JSON.stringify(this.logBuffer.map(e => 
+                `[${e.timestamp}] [${e.level.toUpperCase()}] ${e.message}${e.data ? ' | Data: ' + JSON.stringify(e.data) : ''}`
+            )), true);
+        } catch (e) {
+            // Ignore errors in logging
+        }
+    }
+
+    /**
      * Called when adapter is ready
      */
     async onReady() {
         this.log.info('LLM Controller Adapter wird gestartet...');
+        await this.addLogEntry('info', 'Adapter wird gestartet');
 
         // Initialize components
         this.intentParser = new IntentParser(this.log);
         this.intentParser.setConfidenceThreshold(this.config.confidenceThreshold || 0.5);
         this.objectController = new ObjectController(this, this.log);
+
+        await this.addLogEntry('debug', 'Konfiguration wird validiert', {
+            provider: this.config.llmProvider,
+            model: this.config.model,
+            alexaInstances: this.config.alexa2Instances
+        });
 
         // Validate LLM configuration
         const llmProvider = this.config.llmProvider || 'claude';
@@ -85,6 +123,7 @@ class LlmController extends utils.Adapter {
             }
 
             this.log.info(`Verbindung zu ${LLMFactory.getProviderName(llmProvider)} API hergestellt`);
+            await this.addLogEntry('info', 'LLM Verbindung hergestellt', { provider: llmProvider, model: this.config.model });
 
         } catch (error) {
             this.log.error(`Fehler bei LLM Initialisierung: ${error.message}`);
@@ -98,6 +137,7 @@ class LlmController extends utils.Adapter {
         this.objectController.setCacheDuration(cacheMinutes * 60 * 1000);
 
         // Initial device discovery
+        await this.addLogEntry('info', 'Starte Geräteerkennung...');
         await this.discoverAndStoreDevices();
 
         // Subscribe to multiple Alexa2 instances
@@ -123,6 +163,7 @@ class LlmController extends utils.Adapter {
      */
     async discoverAndStoreDevices() {
         const allowedRooms = this.config.allowedRooms || [];
+        await this.addLogEntry('debug', 'Geräteerkennung gestartet', { allowedRooms });
         const devices = await this.objectController.discoverDevices(allowedRooms);
 
         // Store device list as JSON
@@ -135,6 +176,7 @@ class LlmController extends utils.Adapter {
 
         await this.setStateAsync('devices', JSON.stringify(deviceList), true);
         this.log.info(`${devices.length} Geräte für LLM-Kontext gespeichert`);
+        await this.addLogEntry('info', 'Geräteerkennung abgeschlossen', { deviceCount: devices.length, devices: deviceList });
     }
 
     /**
@@ -219,8 +261,13 @@ class LlmController extends utils.Adapter {
     async handleAlexaHistory(stateId, historyValue) {
         if (!historyValue) return;
 
+        await this.addLogEntry('debug', 'Alexa History empfangen', { stateId, rawValue: historyValue.substring(0, 200) });
+
         const parsed = this.intentParser.parseAlexaHistory(historyValue);
-        if (!parsed) return;
+        if (!parsed) {
+            await this.addLogEntry('debug', 'Alexa History konnte nicht geparst werden');
+            return;
+        }
 
         // Get instance name from state ID
         const instanceMatch = stateId.match(/^(alexa2\.\d+)\.History\.json$/);
@@ -235,11 +282,13 @@ class LlmController extends utils.Adapter {
 
         const command = parsed.text;
         this.log.debug(`Alexa Befehl empfangen von ${instance}: "${command}"`);
+        await this.addLogEntry('info', 'Sprachbefehl empfangen', { instance, command });
 
         // Check trigger words if configured
         const triggerWords = this.config.triggerWords || [];
         if (!this.intentParser.shouldProcessCommand(command, triggerWords)) {
             this.log.debug(`Befehl ignoriert (kein Trigger-Wort): "${command}"`);
+            await this.addLogEntry('info', 'Befehl ignoriert (kein Trigger-Wort)', { command, triggerWords });
             return;
         }
 
@@ -327,6 +376,7 @@ class LlmController extends utils.Adapter {
         const timeoutSeconds = this.config.commandTimeout || 30;
 
         await this.setStateAsync('status', 'processing', true);
+        await this.addLogEntry('info', 'Starte Befehlsverarbeitung', { command, source, instance });
 
         try {
             this.log.info(`Verarbeite Befehl (${source}${instance ? '/' + instance : ''}): "${command}"`);
@@ -338,15 +388,20 @@ class LlmController extends utils.Adapter {
             // Get devices (from cache if available)
             const devices = await this.objectController.getDevicesWithCache();
 
+            await this.addLogEntry('debug', 'Sende Anfrage an LLM', { provider: this.config.llmProvider, deviceCount: devices.length });
+            
             // Analyze with LLM (with timeout)
             const result = await this.withTimeout(
                 this.llmClient.analyzeCommand(command, devices),
                 timeoutSeconds * 1000,
                 'LLM Analyse-Timeout'
             );
+            
+            await this.addLogEntry('debug', 'LLM Antwort erhalten', { success: result.success, intent: result.intent });
 
             if (!result.success) {
                 this.log.error(`LLM Analyse fehlgeschlagen: ${result.error}`);
+                await this.addLogEntry('error', 'LLM Analyse fehlgeschlagen', { error: result.error });
                 await this.setStateAsync('lastResponse', JSON.stringify(result), true);
                 await this.setStateAsync('status', 'error', true);
                 return;
@@ -355,10 +410,12 @@ class LlmController extends utils.Adapter {
             await this.setStateAsync('lastResponse', result.rawResponse, true);
 
             // Validate intent
+            await this.addLogEntry('debug', 'Validiere Intent', { intent: result.intent });
             const validation = this.intentParser.validateIntent(result.intent, devices);
 
             if (!validation.valid) {
                 this.log.warn(`Intent ungültig: ${validation.errors.join(', ')}`);
+                await this.addLogEntry('warn', 'Intent ungültig', { errors: validation.errors, warnings: validation.warnings });
                 await this.setStateAsync('lastAction', JSON.stringify({
                     success: false,
                     errors: validation.errors,
@@ -387,19 +444,24 @@ class LlmController extends utils.Adapter {
             }
 
             // Execute action
+            await this.addLogEntry('info', 'Führe Aktion aus', { intent: result.intent });
             const actionResult = await this.objectController.executeAction(result.intent);
             await this.setStateAsync('lastAction', JSON.stringify(actionResult), true);
+            await this.addLogEntry('info', 'Aktion ausgeführt', { result: actionResult });
 
             if (actionResult.success) {
                 this.log.info(`Aktion erfolgreich: ${actionResult.device} = ${actionResult.newValue}`);
+                await this.addLogEntry('info', 'Aktion erfolgreich', { device: actionResult.device, value: actionResult.newValue });
                 await this.setStateAsync('status', 'success', true);
             } else {
                 this.log.error(`Aktion fehlgeschlagen: ${actionResult.error}`);
+                await this.addLogEntry('error', 'Aktion fehlgeschlagen', { error: actionResult.error });
                 await this.setStateAsync('status', 'action_failed', true);
             }
 
         } catch (error) {
             this.log.error(`Fehler bei Befehlsverarbeitung: ${error.message}`);
+            await this.addLogEntry('error', 'Fehler bei Befehlsverarbeitung', { error: error.message, stack: error.stack });
             await this.setStateAsync('status', `error: ${error.message}`, true);
         }
     }

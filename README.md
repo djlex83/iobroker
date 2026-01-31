@@ -133,6 +133,12 @@ Alexej Horner
 
 ## Changelog
 
+### 0.3.1 (UI Fixes & Logging)
+- **Dropdowns gefixt**: Provider, Modelle und Alexa-Instanzen funktionieren jetzt korrekt
+- **Log-System**: Neue `log` Datenpunkt mit Verarbeitungshistorie
+- **Log-Level**: Einstellbare Log-Detailstufe
+- **Live-Log in Admin UI**: Direkte Anzeige der Verarbeitungsschritte
+
 ### 0.3.0 (Multi-LLM Support)
 - **Multi-LLM Unterstützung**: Claude, ChatGPT, Gemini und Kimi auswählbar
 - **Dynamische Modell-Auswahl**: Modelle werden je nach Provider aktualisiert

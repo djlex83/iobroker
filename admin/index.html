@@ -12,9 +12,6 @@
     <script type="text/javascript" src="../../js/adapter-settings.js"></script>
     <script type="text/javascript" src="words.js"></script>
     <script type="text/javascript">
-        let secret;
-        let alexaInstances = [];
-
         // Available LLM providers and their models
         const LLM_PROVIDERS = {
             claude: {
@@ -51,91 +48,123 @@
             }
         };
 
+        var activeElement = null;
+
         // This will be called by the admin adapter when the settings page is loaded
         function load(settings, onChange) {
+            activeElement = $(document.activeElement);
+            
             if (!settings) return;
 
-            // Load settings into form
-            $('.value').each(function () {
-                const $this = $(this);
-                const id = $this.attr('id');
+            // Set default values if not present
+            settings.llmProvider = settings.llmProvider || 'claude';
+            settings.model = settings.model || 'claude-sonnet-4-20250514';
+            settings.maxTokens = settings.maxTokens || 1024;
+            settings.commandTimeout = settings.commandTimeout || 30;
+            settings.deviceCacheMinutes = settings.deviceCacheMinutes || 5;
+            settings.debounceMs = settings.debounceMs || 500;
+            settings.confidenceThreshold = settings.confidenceThreshold || 0.5;
+            settings.alexa2Instances = settings.alexa2Instances || ['alexa2.0'];
+            settings.triggerWords = settings.triggerWords || [];
 
-                if ($this.attr('type') === 'checkbox') {
-                    $this.prop('checked', settings[id])
-                        .on('change', () => onChange());
-                } else {
-                    $this.val(settings[id])
-                        .on('change', () => onChange())
-                        .on('keyup', () => onChange());
-                }
-            });
+            // Initialize provider dropdown FIRST
+            initProviderDropdown(settings.llmProvider);
+            
+            // THEN update model dropdown
+            updateModelDropdown(settings.llmProvider, settings.model);
 
-            // Handle password field
-            if (settings.apiKey) {
-                $('#apiKey').val(settings.apiKey);
-            }
+            // Load other values
+            $('#apiKey').val(settings.apiKey || '');
+            $('#maxTokens').val(settings.maxTokens);
+            $('#commandTimeout').val(settings.commandTimeout);
+            $('#deviceCacheMinutes').val(settings.deviceCacheMinutes);
+            $('#debounceMs').val(settings.debounceMs);
+            $('#confidenceThreshold').val(settings.confidenceThreshold);
+            $('#allowedRooms').val(settings.allowedRooms || '');
+            $('#systemPrompt').val(settings.systemPrompt || '');
+            $('#confirmActions').prop('checked', settings.confirmActions || false);
 
-            // Initialize provider dropdown
-            initProviderDropdown(settings.llmProvider || 'claude');
-
-            // Load models for selected provider
-            updateModelDropdown(settings.llmProvider || 'claude', settings.model);
-
-            // Initialize select
-            $('select').formSelect();
-
-            // Load Alexa2 instances
-            loadAlexaInstances(settings.alexa2Instances || ['alexa2.0']);
-
-            // Handle trigger words
             if (settings.triggerWords && Array.isArray(settings.triggerWords)) {
                 $('#triggerWords').val(settings.triggerWords.join(', '));
             }
 
+            // Initialize all selects
+            $('select').formSelect();
+
+            // Load Alexa2 instances
+            loadAlexaInstances(settings.alexa2Instances);
+
             // Provider change handler
             $('#llmProvider').on('change', function() {
-                const provider = $(this).val();
+                var provider = $(this).val();
+                console.log('Provider changed to:', provider);
                 updateModelDropdown(provider);
                 updateApiKeyLabel(provider);
+                onChange();
+                M.updateTextFields();
+            });
+
+            // Model change handler
+            $('#model').on('change', function() {
+                onChange();
+            });
+
+            // Other input handlers
+            $('.value').on('change', function() {
+                onChange();
+            }).on('keyup', function() {
                 onChange();
             });
 
             onChange(false);
             M.updateTextFields();
+            
+            console.log('Settings loaded:', settings);
         }
 
         // Initialize provider dropdown
         function initProviderDropdown(selectedProvider) {
-            const $select = $('#llmProvider');
+            var $select = $('#llmProvider');
             $select.empty();
 
-            for (const [key, provider] of Object.entries(LLM_PROVIDERS)) {
-                const isSelected = key === selectedProvider;
-                $select.append('<option value="' + key + '"' + (isSelected ? ' selected' : '') + '>' + provider.name + '</option>');
+            for (var key in LLM_PROVIDERS) {
+                if (LLM_PROVIDERS.hasOwnProperty(key)) {
+                    var provider = LLM_PROVIDERS[key];
+                    var isSelected = key === selectedProvider;
+                    $select.append('<option value="' + key + '"' + (isSelected ? ' selected' : '') + '>' + provider.name + '</option>');
+                }
             }
-
+            
             updateApiKeyLabel(selectedProvider);
         }
 
         // Update model dropdown based on provider
         function updateModelDropdown(provider, selectedModel) {
-            const $select = $('#model');
+            var $select = $('#model');
             $select.empty();
 
-            const providerData = LLM_PROVIDERS[provider];
-            if (!providerData) return;
+            var providerData = LLM_PROVIDERS[provider];
+            if (!providerData) {
+                console.error('Unknown provider:', provider);
+                return;
+            }
 
-            for (const model of providerData.models) {
-                const isSelected = selectedModel === model.id || (!selectedModel && model.id === providerData.models[0].id);
+            for (var i = 0; i < providerData.models.length; i++) {
+                var model = providerData.models[i];
+                // Select if matches selectedModel OR if it's the first model and no selection yet
+                var isSelected = (selectedModel && selectedModel === model.id) || 
+                                 (!selectedModel && i === 0);
                 $select.append('<option value="' + model.id + '"' + (isSelected ? ' selected' : '') + '>' + model.name + '</option>');
             }
 
+            // Re-initialize select
             $select.formSelect();
+            console.log('Models updated for', provider, ':', providerData.models.length, 'models');
         }
 
         // Update API key label based on provider
         function updateApiKeyLabel(provider) {
-            const providerData = LLM_PROVIDERS[provider];
+            var providerData = LLM_PROVIDERS[provider];
             if (providerData) {
                 $('label[for="apiKey"]').text(providerData.name + ' API Key');
             }
@@ -143,24 +172,33 @@
 
         // Load available Alexa2 instances
         function loadAlexaInstances(selectedInstances) {
-            socket.emit('getObjectView', 'system', 'instance', { startkey: 'system.adapter.alexa2.', endkey: 'system.adapter.alexa2.\u9999' }, function (err, res) {
+            socket.emit('getObjectView', 'system', 'instance', { 
+                startkey: 'system.adapter.alexa2.', 
+                endkey: 'system.adapter.alexa2.\u9999' 
+            }, function (err, res) {
                 if (!err && res) {
-                    alexaInstances = [];
-                    const $select = $('#alexa2Instances');
+                    var $select = $('#alexa2Instances');
                     $select.empty();
 
-                    res.rows.forEach(function (row) {
-                        const instance = row.id.replace('system.adapter.', '');
-                        alexaInstances.push(instance);
-                        const isSelected = selectedInstances.includes(instance);
-                        $select.append('<option value="' + instance + '"' + (isSelected ? ' selected' : '') + '>' + instance + '</option>');
-                    });
-
-                    // If no alexa2 found, add a placeholder
-                    if (alexaInstances.length === 0) {
-                        $select.append('<option value="alexa2.0" selected>alexa2.0 (nicht installiert)</option>');
+                    if (res.rows && res.rows.length > 0) {
+                        for (var i = 0; i < res.rows.length; i++) {
+                            var row = res.rows[i];
+                            var instance = row.id.replace('system.adapter.', '');
+                            var isSelected = selectedInstances.indexOf(instance) !== -1;
+                            $select.append('<option value="' + instance + '"' + (isSelected ? ' selected' : '') + '>' + instance + '</option>');
+                        }
+                    } else {
+                        // Fallback
+                        $select.append('<option value="alexa2.0" selected>alexa2.0</option>');
                     }
 
+                    $select.formSelect();
+                } else {
+                    console.error('Error loading Alexa instances:', err);
+                    // Fallback
+                    var $select = $('#alexa2Instances');
+                    $select.empty();
+                    $select.append('<option value="alexa2.0" selected>alexa2.0</option>');
                     $select.formSelect();
                 }
             });
@@ -168,31 +206,33 @@
 
         // This will be called by the admin adapter when settings should be saved
         function save(callback) {
-            const obj = {};
+            var obj = {};
 
-            $('.value').each(function () {
-                const $this = $(this);
-                const id = $this.attr('id');
+            obj.llmProvider = $('#llmProvider').val();
+            obj.model = $('#model').val();
+            obj.apiKey = $('#apiKey').val();
+            obj.maxTokens = parseInt($('#maxTokens').val(), 10) || 1024;
+            obj.commandTimeout = parseInt($('#commandTimeout').val(), 10) || 30;
+            obj.deviceCacheMinutes = parseInt($('#deviceCacheMinutes').val(), 10) || 5;
+            obj.debounceMs = parseInt($('#debounceMs').val(), 10) || 500;
+            obj.confidenceThreshold = parseFloat($('#confidenceThreshold').val()) || 0.5;
+            obj.allowedRooms = $('#allowedRooms').val();
+            obj.systemPrompt = $('#systemPrompt').val();
+            obj.confirmActions = $('#confirmActions').prop('checked');
 
-                if ($this.attr('type') === 'checkbox') {
-                    obj[id] = $this.prop('checked');
-                } else if (id === 'alexa2Instances') {
-                    // Get selected options from multi-select
-                    const selected = $this.val() || [];
-                    obj[id] = selected;
-                } else if (id === 'triggerWords') {
-                    // Convert comma-separated string to array
-                    const value = $this.val();
-                    obj[id] = value ? value.split(',').map(s => s.trim()).filter(s => s) : [];
-                } else if (id === 'maxTokens' || id === 'commandTimeout' || id === 'deviceCacheMinutes' || id === 'debounceMs') {
-                    obj[id] = parseInt($this.val(), 10) || 0;
-                } else if (id === 'confidenceThreshold') {
-                    obj[id] = parseFloat($this.val()) || 0.5;
-                } else {
-                    obj[id] = $this.val();
-                }
-            });
+            // Get selected Alexa instances
+            var alexaInstances = $('#alexa2Instances').val() || [];
+            obj.alexa2Instances = alexaInstances;
 
+            // Trigger words
+            var triggerWordsVal = $('#triggerWords').val();
+            obj.triggerWords = triggerWordsVal ? triggerWordsVal.split(',').map(function(s) { 
+                return s.trim(); 
+            }).filter(function(s) { 
+                return s; 
+            }) : [];
+
+            console.log('Saving settings:', obj);
             callback(obj);
         }
     </script>
@@ -220,16 +260,16 @@
                     <option value="gemini">Google Gemini</option>
                     <option value="kimi">Kimi (Moonshot)</option>
                 </select>
-                <label class="translate">LLM Provider</label>
-                <span class="helper-text">Wähle den KI-Anbieter für die Sprachverarbeitung</span>
+                <label>LLM Provider</label>
+                <span class="helper-text">Wähle den KI-Anbieter</span>
             </div>
 
             <div class="input-field col s12 m6">
                 <select id="model" class="value">
                     <option value="claude-sonnet-4-20250514" selected>Claude Sonnet 4 (Empfohlen)</option>
                 </select>
-                <label class="translate">Modell</label>
-                <span class="helper-text">Das Modell wird automatisch an den Provider angepasst</span>
+                <label>Modell</label>
+                <span class="helper-text">Wird automatisch angepasst</span>
             </div>
         </div>
 
@@ -243,28 +283,28 @@
         <div class="row">
             <div class="input-field col s12 m8">
                 <input type="password" id="apiKey" class="value">
-                <label for="apiKey" class="translate">API Key</label>
-                <span class="helper-text" data-error="wrong" data-success="right">
-                    Dein API Key für den gewählten Provider
-                </span>
+                <label for="apiKey">API Key</label>
+                <span class="helper-text">API Key für den gewählten Provider</span>
             </div>
 
             <div class="input-field col s12 m4">
                 <input type="number" id="maxTokens" class="value" value="1024" min="256" max="4096">
-                <label for="maxTokens" class="translate">Max Tokens</label>
-                <span class="helper-text">Maximale Antwortlänge</span>
+                <label for="maxTokens">Max Tokens</label>
             </div>
         </div>
 
         <div class="row">
-            <div class="input-field col s12 m6">
+            <div class="input-field col s12 m4">
                 <input type="number" id="commandTimeout" class="value" value="30" min="5" max="120">
-                <label for="commandTimeout" class="translate">Befehls-Timeout (Sekunden)</label>
+                <label for="commandTimeout">Timeout (Sek)</label>
             </div>
-            <div class="input-field col s12 m6">
+            <div class="input-field col s12 m4">
                 <input type="number" id="confidenceThreshold" class="value" value="0.5" min="0" max="1" step="0.1">
-                <label for="confidenceThreshold" class="translate">Minimale Konfidenz (0.0-1.0)</label>
-                <span class="helper-text">Schwellwert für Befehlsausführung</span>
+                <label for="confidenceThreshold">Min. Konfidenz</label>
+            </div>
+            <div class="input-field col s12 m4">
+                <input type="number" id="debounceMs" class="value" value="500" min="0" max="5000" step="100">
+                <label for="debounceMs">Debounce (ms)</label>
             </div>
         </div>
 
@@ -280,14 +320,14 @@
                 <select id="alexa2Instances" class="value" multiple>
                     <option value="alexa2.0" selected>alexa2.0</option>
                 </select>
-                <label class="translate">Alexa2 Adapter Instanzen</label>
+                <label>Alexa2 Instanzen</label>
                 <span class="helper-text">Mehrere mit Strg/Cmd auswählen</span>
             </div>
 
             <div class="input-field col s12 m6">
                 <input type="text" id="triggerWords" class="value">
-                <label for="triggerWords" class="translate">Trigger-Wörter (kommagetrennt)</label>
-                <span class="helper-text">z.B.: "Computer, Haus" (leer = alle Befehle)</span>
+                <label for="triggerWords">Trigger-Wörter (optional)</label>
+                <span class="helper-text">z.B.: "Computer, Haus"</span>
             </div>
         </div>
 
@@ -299,50 +339,83 @@
         </div>
 
         <div class="row">
-            <div class="input-field col s12 m6">
+            <div class="input-field col s12 m4">
                 <input type="text" id="allowedRooms" class="value">
-                <label for="allowedRooms" class="translate">Erlaubte Räume (kommagetrennt)</label>
-                <span class="helper-text">Leer lassen für alle Räume</span>
+                <label for="allowedRooms">Erlaubte Räume</label>
+                <span class="helper-text">Leer = alle Räume</span>
             </div>
 
-            <div class="col s12 m6">
+            <div class="input-field col s12 m4">
+                <input type="number" id="deviceCacheMinutes" class="value" value="5" min="1" max="60">
+                <label for="deviceCacheMinutes">Cache (Minuten)</label>
+            </div>
+
+            <div class="col s12 m4" style="padding-top: 25px;">
                 <label>
                     <input type="checkbox" id="confirmActions" class="value filled-in">
-                    <span class="translate">Aktionen mit niedriger Konfidenz bestätigen</span>
+                    <span>Niedrige Konfidenz bestätigen</span>
                 </label>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="input-field col s12 m6">
-                <input type="number" id="deviceCacheMinutes" class="value" value="5" min="1" max="60">
-                <label for="deviceCacheMinutes" class="translate">Geräte-Cache (Minuten)</label>
-                <span class="helper-text">Wie oft Geräteliste aktualisiert wird</span>
-            </div>
-            <div class="input-field col s12 m6">
-                <input type="number" id="debounceMs" class="value" value="500" min="0" max="5000" step="100">
-                <label for="debounceMs" class="translate">Debounce (Millisekunden)</label>
-                <span class="helper-text">Verzögerung für schnelle Befehle</span>
             </div>
         </div>
 
         <!-- Custom System Prompt -->
         <div class="row">
             <div class="col s12">
-                <h5 class="translate">Erweiterter System-Prompt (Optional)</h5>
+                <h5 class="translate">System Prompt (Optional)</h5>
             </div>
         </div>
 
         <div class="row">
             <div class="input-field col s12">
-                <textarea id="systemPrompt" class="value materialize-textarea" rows="6"></textarea>
-                <label for="systemPrompt" class="translate">Zusätzlicher System-Prompt</label>
-                <span class="helper-text">
-                    Optional: Erweitere den Standard-Prompt mit eigenen Anweisungen.
-                    Leer lassen für Standard-Prompt.
-                </span>
+                <textarea id="systemPrompt" class="value materialize-textarea" rows="4"></textarea>
+                <label for="systemPrompt">Zusätzlicher System-Prompt</label>
+                <span class="helper-text">Eigene Anweisungen für das LLM</span>
             </div>
         </div>
+
+        <!-- Log Section -->
+        <div class="row">
+            <div class="col s12">
+                <h5 class="translate">Log-Anzeige</h5>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col s12">
+                <div class="input-field">
+                    <textarea id="logPreview" class="materialize-textarea" rows="10" readonly style="font-family: monospace; font-size: 12px; background: #f5f5f5; min-height: 200px;"></textarea>
+                    <label for="logPreview" class="active">Letzte Logs (llm-controller.0.log)</label>
+                </div>
+                <button type="button" class="btn-small blue" onclick="refreshLog()">
+                    <i class="material-icons left">refresh</i>Log aktualisieren
+                </button>
+                <button type="button" class="btn-small red" onclick="clearLog()">
+                    <i class="material-icons left">delete</i>Log leeren
+                </button>
+            </div>
+        </div>
+
+        <script>
+            function refreshLog() {
+                socket.emit('getState', 'llm-controller.0.log', function(err, state) {
+                    if (state && state.val) {
+                        var logs = JSON.parse(state.val);
+                        $('#logPreview').val(logs.join('\n'));
+                        M.textareaAutoResize($('#logPreview'));
+                    } else {
+                        $('#logPreview').val('Keine Logs vorhanden. Starte den Adapter um Logs zu sehen.');
+                    }
+                });
+            }
+
+            function clearLog() {
+                socket.emit('setState', 'llm-controller.0.log', JSON.stringify([]));
+                $('#logPreview').val('');
+            }
+
+            // Auto-refresh every 5 seconds
+            setInterval(refreshLog, 5000);
+        </script>
 
         <!-- Help Section -->
         <div class="row">
@@ -352,20 +425,18 @@
                         <span class="card-title">Hilfe</span>
                         <p><strong>So funktioniert der Adapter:</strong></p>
                         <ol>
-                            <li>Wähle deinen bevorzugten LLM-Provider (Claude, ChatGPT, Gemini oder Kimi)</li>
-                            <li>Gib deinen API Key ein (bekommst du auf der Provider-Website)</li>
-                            <li>Wähle die Alexa2-Instanzen die überwacht werden sollen</li>
+                            <li>Wähle deinen LLM-Provider und das Modell</li>
+                            <li>Gib deinen API Key ein</li>
+                            <li>Wähle die zu überwachenden Alexa2-Instanzen</li>
                             <li>Speichern und Adapter starten</li>
                         </ol>
-                        <p><strong>Unterstützte Provider:</strong></p>
+                        <p><strong>API Keys:</strong></p>
                         <ul>
-                            <li><strong>Claude (Anthropic)</strong>: Sehr gute Sprachverarbeitung</li>
-                            <li><strong>ChatGPT (OpenAI)</strong>: Schnell und zuverlässig</li>
-                            <li><strong>Gemini (Google)</strong>: Gute Performance</li>
-                            <li><strong>Kimi (Moonshot)</strong>: Starke Alternative</li>
+                            <li>Claude: console.anthropic.com</li>
+                            <li>OpenAI: platform.openai.com</li>
+                            <li>Gemini: ai.google.dev</li>
+                            <li>Kimi: platform.moonshot.cn</li>
                         </ul>
-                        <p><strong>Manueller Input:</strong></p>
-                        <p>Schreibe in den State <code>llm-controller.0.manualInput</code> um Befehle direkt zu testen.</p>
                     </div>
                 </div>
             </div>
