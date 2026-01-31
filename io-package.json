@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "llm-controller",
-    "version": "0.4.2",
+    "version": "0.4.3",
     "news": {
+      "0.4.3": {
+        "en": "Added Gemini 2.5 Flash and Flash-Lite latest models",
+        "de": "Gemini 2.5 Flash und Flash-Lite Modelle hinzugefügt"
+      },
       "0.4.2": {
         "en": "Added latest Gemini 2.5 Pro and Gemini 2.0 Flash models",
         "de": "Neueste Gemini 2.5 Pro und Gemini 2.0 Flash Modelle hinzugefügt"

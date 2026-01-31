@@ -1,6 +1,6 @@
 {
   "name": "iobroker.llm-controller",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "ioBroker adapter to control devices via multiple LLM providers (Claude, ChatGPT, Gemini, Kimi) based on Alexa voice input",
   "author": {
     "name": "Alexej Horner"
