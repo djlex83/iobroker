@@ -1,7 +1,7 @@
 {
   "name": "iobroker.llm-controller",
-  "version": "0.2.0",
-  "description": "ioBroker adapter to control devices via LLM (Claude) based on Alexa voice input",
+  "version": "0.3.0",
+  "description": "ioBroker adapter to control devices via multiple LLM providers (Claude, ChatGPT, Gemini, Kimi) based on Alexa voice input",
   "author": {
     "name": "Alexej Horner"
   },
@@ -11,9 +11,14 @@
     "ioBroker",
     "llm",
     "claude",
+    "openai",
+    "chatgpt",
+    "gemini",
+    "kimi",
     "alexa",
     "smart home",
-    "voice control"
+    "voice control",
+    "ai"
   ],
   "repository": {
     "type": "git",
@@ -24,7 +29,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "@iobroker/adapter-core": "^3.0.0"
+    "@google/generative-ai": "^0.21.0",
+    "@iobroker/adapter-core": "^3.0.0",
+    "openai": "^4.0.0"
   },
   "devDependencies": {},
   "main": "main.js",

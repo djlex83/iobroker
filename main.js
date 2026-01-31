@@ -1,7 +1,7 @@
 'use strict';
 
 const utils = require('@iobroker/adapter-core');
-const ClaudeClient = require('./lib/claude-client');
+const LLMFactory = require('./lib/llm-factory');
 const ObjectController = require('./lib/object-controller');
 const IntentParser = require('./lib/intent-parser');
 
@@ -13,7 +13,7 @@ class LlmController extends utils.Adapter {
             name: 'llm-controller',
         });
 
-        this.claudeClient = null;
+        this.llmClient = null;
         this.objectController = null;
         this.intentParser = null;
         
@@ -49,39 +49,45 @@ class LlmController extends utils.Adapter {
         this.intentParser.setConfidenceThreshold(this.config.confidenceThreshold || 0.5);
         this.objectController = new ObjectController(this, this.log);
 
-        // Check API key configuration
-        if (!this.config.apiKey) {
-            this.log.error('Anthropic API Key nicht konfiguriert! Bitte in den Adapter-Einstellungen eintragen.');
+        // Validate LLM configuration
+        const llmProvider = this.config.llmProvider || 'claude';
+        const validation = LLMFactory.validateConfig(llmProvider, {
+            apiKey: this.config.apiKey,
+            model: this.config.model
+        });
+
+        if (!validation.valid) {
+            this.log.error(`LLM Konfiguration ungültig: ${validation.error}`);
             await this.setStateAsync('info.connection', false, true);
-            await this.setStateAsync('status', 'error: no API key', true);
+            await this.setStateAsync('status', `error: ${validation.error}`, true);
             return;
         }
 
-        // Initialize Claude client
-        this.claudeClient = new ClaudeClient({
-            apiKey: this.config.apiKey,
-            model: this.config.model || 'claude-sonnet-4-20250514',
-            systemPrompt: this.config.systemPrompt,
-            maxTokens: this.config.maxTokens || 1024
-        }, this.log);
-
+        // Initialize LLM client via factory
         try {
-            this.claudeClient.initialize();
+            this.llmClient = LLMFactory.createClient(llmProvider, {
+                apiKey: this.config.apiKey,
+                model: this.config.model,
+                systemPrompt: this.config.systemPrompt,
+                maxTokens: this.config.maxTokens || 1024
+            }, this.log);
+
+            this.llmClient.initialize();
 
             // Test connection
-            const connected = await this.claudeClient.testConnection();
+            const connected = await this.llmClient.testConnection();
             await this.setStateAsync('info.connection', connected, true);
 
             if (!connected) {
-                this.log.error('Verbindung zu Claude API fehlgeschlagen');
+                this.log.error(`Verbindung zu ${LLMFactory.getProviderName(llmProvider)} API fehlgeschlagen`);
                 await this.setStateAsync('status', 'error: connection failed', true);
                 return;
             }
 
-            this.log.info('Verbindung zu Claude API hergestellt');
+            this.log.info(`Verbindung zu ${LLMFactory.getProviderName(llmProvider)} API hergestellt`);
 
         } catch (error) {
-            this.log.error(`Fehler bei Claude Initialisierung: ${error.message}`);
+            this.log.error(`Fehler bei LLM Initialisierung: ${error.message}`);
             await this.setStateAsync('info.connection', false, true);
             await this.setStateAsync('status', `error: ${error.message}`, true);
             return;
@@ -108,6 +114,7 @@ class LlmController extends utils.Adapter {
         
         // Log configuration
         const instances = this.config.alexa2Instances || ['alexa2.0'];
+        this.log.info(`Provider: ${LLMFactory.getProviderName(llmProvider)}, Modell: ${this.config.model}`);
         this.log.info(`Überwache ${instances.length} Alexa2-Instanz(en): ${instances.join(', ')}`);
     }
 
@@ -325,17 +332,17 @@ class LlmController extends utils.Adapter {
             this.log.info(`Verarbeite Befehl (${source}${instance ? '/' + instance : ''}): "${command}"`);
             await this.setStateAsync('lastCommand', command, true);
 
-            // Rate limiting for Claude API
+            // Rate limiting for LLM API
             await this.applyRateLimit();
 
             // Get devices (from cache if available)
             const devices = await this.objectController.getDevicesWithCache();
 
-            // Analyze with Claude (with timeout)
+            // Analyze with LLM (with timeout)
             const result = await this.withTimeout(
-                this.claudeClient.analyzeCommand(command, devices),
+                this.llmClient.analyzeCommand(command, devices),
                 timeoutSeconds * 1000,
-                'Claude Analyse-Timeout'
+                'LLM Analyse-Timeout'
             );
 
             if (!result.success) {

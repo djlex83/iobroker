@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "llm-controller",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "news": {
+      "0.3.0": {
+        "en": "Multi-LLM support: Claude, ChatGPT, Gemini, Kimi selectable via dropdown",
+        "de": "Multi-LLM Unterstützung: Claude, ChatGPT, Gemini, Kimi per Dropdown wählbar"
+      },
       "0.2.0": {
         "en": "Multi-Alexa support, device caching, debouncing, rate limiting",
         "de": "Multi-Alexa-Support, Geräte-Caching, Debouncing, Rate Limiting"
@@ -18,11 +22,11 @@
       "de": "LLM Controller"
     },
     "desc": {
-      "en": "Control ioBroker devices via LLM (Claude) based on Alexa voice input",
-      "de": "Steuerung von ioBroker-Geräten über LLM (Claude) basierend auf Alexa-Spracheingaben"
+      "en": "Control ioBroker devices via multiple LLM providers (Claude, ChatGPT, Gemini, Kimi) based on Alexa voice input",
+      "de": "Steuerung von ioBroker-Geräten über verschiedene LLM-Anbieter (Claude, ChatGPT, Gemini, Kimi) basierend auf Alexa-Spracheingaben"
     },
     "authors": ["Alexej Horner"],
-    "keywords": ["llm", "claude", "alexa", "voice", "smart home"],
+    "keywords": ["llm", "claude", "openai", "chatgpt", "gemini", "kimi", "alexa", "voice", "smart home", "ai"],
     "license": "MIT",
     "platform": "Javascript/Node.js",
     "main": "main.js",
@@ -53,8 +57,9 @@
   "native": {
     "apiKey": "",
     "model": "claude-sonnet-4-20250514",
-    "alexa2Instances": ["alexa2.0"],
-    "triggerWords": [],
+    "llmProvider": "claude",
+    "apiKey": "",
+    "model": "claude-sonnet-4-20250514",
     "alexa2Instances": ["alexa2.0"],
     "triggerWords": [],
     "allowedRooms": [],
@@ -81,7 +86,7 @@
       "type": "state",
       "common": {
         "role": "indicator.connected",
-        "name": "Connection to Claude API",
+        "name": "Connection to LLM API",
         "type": "boolean",
         "read": true,
         "write": false,

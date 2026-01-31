@@ -15,6 +15,42 @@
         let secret;
         let alexaInstances = [];
 
+        // Available LLM providers and their models
+        const LLM_PROVIDERS = {
+            claude: {
+                name: 'Anthropic Claude',
+                models: [
+                    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4 (Empfohlen)' },
+                    { id: 'claude-opus-4-20250514', name: 'Claude Opus 4 (Beste Qualität)' },
+                    { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Schnell)' }
+                ]
+            },
+            openai: {
+                name: 'OpenAI (ChatGPT)',
+                models: [
+                    { id: 'gpt-4o', name: 'GPT-4o (Beste Qualität)' },
+                    { id: 'gpt-4o-mini', name: 'GPT-4o Mini (Günstig)' },
+                    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+                    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo (Schnell)' }
+                ]
+            },
+            gemini: {
+                name: 'Google Gemini',
+                models: [
+                    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Beste Qualität)' },
+                    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+                    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Schnell)' }
+                ]
+            },
+            kimi: {
+                name: 'Kimi (Moonshot)',
+                models: [
+                    { id: 'kimi-k2-5', name: 'Kimi K2.5 (Empfohlen)' },
+                    { id: 'kimi-k1.5', name: 'Kimi K1.5' }
+                ]
+            }
+        };
+
         // This will be called by the admin adapter when the settings page is loaded
         function load(settings, onChange) {
             if (!settings) return;
@@ -39,6 +75,12 @@
                 $('#apiKey').val(settings.apiKey);
             }
 
+            // Initialize provider dropdown
+            initProviderDropdown(settings.llmProvider || 'claude');
+
+            // Load models for selected provider
+            updateModelDropdown(settings.llmProvider || 'claude', settings.model);
+
             // Initialize select
             $('select').formSelect();
 
@@ -50,8 +92,53 @@
                 $('#triggerWords').val(settings.triggerWords.join(', '));
             }
 
+            // Provider change handler
+            $('#llmProvider').on('change', function() {
+                const provider = $(this).val();
+                updateModelDropdown(provider);
+                updateApiKeyLabel(provider);
+                onChange();
+            });
+
             onChange(false);
             M.updateTextFields();
+        }
+
+        // Initialize provider dropdown
+        function initProviderDropdown(selectedProvider) {
+            const $select = $('#llmProvider');
+            $select.empty();
+
+            for (const [key, provider] of Object.entries(LLM_PROVIDERS)) {
+                const isSelected = key === selectedProvider;
+                $select.append('<option value="' + key + '"' + (isSelected ? ' selected' : '') + '>' + provider.name + '</option>');
+            }
+
+            updateApiKeyLabel(selectedProvider);
+        }
+
+        // Update model dropdown based on provider
+        function updateModelDropdown(provider, selectedModel) {
+            const $select = $('#model');
+            $select.empty();
+
+            const providerData = LLM_PROVIDERS[provider];
+            if (!providerData) return;
+
+            for (const model of providerData.models) {
+                const isSelected = selectedModel === model.id || (!selectedModel && model.id === providerData.models[0].id);
+                $select.append('<option value="' + model.id + '"' + (isSelected ? ' selected' : '') + '>' + model.name + '</option>');
+            }
+
+            $select.formSelect();
+        }
+
+        // Update API key label based on provider
+        function updateApiKeyLabel(provider) {
+            const providerData = LLM_PROVIDERS[provider];
+            if (providerData) {
+                $('label[for="apiKey"]').text(providerData.name + ' API Key');
+            }
         }
 
         // Load available Alexa2 instances
@@ -97,8 +184,10 @@
                     // Convert comma-separated string to array
                     const value = $this.val();
                     obj[id] = value ? value.split(',').map(s => s.trim()).filter(s => s) : [];
-                } else if (id === 'maxTokens') {
-                    obj[id] = parseInt($this.val(), 10) || 1024;
+                } else if (id === 'maxTokens' || id === 'commandTimeout' || id === 'deviceCacheMinutes' || id === 'debounceMs') {
+                    obj[id] = parseInt($this.val(), 10) || 0;
+                } else if (id === 'confidenceThreshold') {
+                    obj[id] = parseFloat($this.val()) || 0.5;
                 } else {
                     obj[id] = $this.val();
                 }
@@ -116,42 +205,66 @@
             </div>
         </div>
 
-        <!-- API Configuration -->
+        <!-- LLM Provider Selection -->
         <div class="row">
             <div class="col s12">
-                <h5 class="translate">Claude API Konfiguration</h5>
+                <h5 class="translate">LLM Provider Auswahl</h5>
             </div>
         </div>
 
         <div class="row">
             <div class="input-field col s12 m6">
-                <input type="password" id="apiKey" class="value">
-                <label for="apiKey" class="translate">Anthropic API Key</label>
-                <span class="helper-text" data-error="wrong" data-success="right">
-                    Dein Anthropic API Key für Claude
-                </span>
+                <select id="llmProvider" class="value">
+                    <option value="claude" selected>Anthropic Claude</option>
+                    <option value="openai">OpenAI (ChatGPT)</option>
+                    <option value="gemini">Google Gemini</option>
+                    <option value="kimi">Kimi (Moonshot)</option>
+                </select>
+                <label class="translate">LLM Provider</label>
+                <span class="helper-text">Wähle den KI-Anbieter für die Sprachverarbeitung</span>
             </div>
 
             <div class="input-field col s12 m6">
                 <select id="model" class="value">
-                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Empfohlen)</option>
-                    <option value="claude-opus-4-20250514">Claude Opus 4 (Beste Qualität)</option>
-                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Schnell & Günstig)</option>
+                    <option value="claude-sonnet-4-20250514" selected>Claude Sonnet 4 (Empfohlen)</option>
                 </select>
-                <label class="translate">Claude Modell</label>
+                <label class="translate">Modell</label>
+                <span class="helper-text">Das Modell wird automatisch an den Provider angepasst</span>
+            </div>
+        </div>
+
+        <!-- API Configuration -->
+        <div class="row">
+            <div class="col s12">
+                <h5 class="translate">API Konfiguration</h5>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="input-field col s12 m8">
+                <input type="password" id="apiKey" class="value">
+                <label for="apiKey" class="translate">API Key</label>
+                <span class="helper-text" data-error="wrong" data-success="right">
+                    Dein API Key für den gewählten Provider
+                </span>
+            </div>
+
+            <div class="input-field col s12 m4">
+                <input type="number" id="maxTokens" class="value" value="1024" min="256" max="4096">
+                <label for="maxTokens" class="translate">Max Tokens</label>
+                <span class="helper-text">Maximale Antwortlänge</span>
             </div>
         </div>
 
         <div class="row">
             <div class="input-field col s12 m6">
-                <input type="number" id="maxTokens" class="value" value="1024" min="256" max="4096">
-                <label for="maxTokens" class="translate">Max Tokens</label>
-                <span class="helper-text">Maximale Antwortlänge (256-4096)</span>
-            </div>
-            <div class="input-field col s12 m6">
                 <input type="number" id="commandTimeout" class="value" value="30" min="5" max="120">
                 <label for="commandTimeout" class="translate">Befehls-Timeout (Sekunden)</label>
-                <span class="helper-text">Maximale Zeit für Befehlsverarbeitung</span>
+            </div>
+            <div class="input-field col s12 m6">
+                <input type="number" id="confidenceThreshold" class="value" value="0.5" min="0" max="1" step="0.1">
+                <label for="confidenceThreshold" class="translate">Minimale Konfidenz (0.0-1.0)</label>
+                <span class="helper-text">Schwellwert für Befehlsausführung</span>
             </div>
         </div>
 
@@ -168,13 +281,13 @@
                     <option value="alexa2.0" selected>alexa2.0</option>
                 </select>
                 <label class="translate">Alexa2 Adapter Instanzen</label>
-                <span class="helper-text">Mehrere Instanzen mit Strg/Cmd auswählen</span>
+                <span class="helper-text">Mehrere mit Strg/Cmd auswählen</span>
             </div>
 
             <div class="input-field col s12 m6">
                 <input type="text" id="triggerWords" class="value">
                 <label for="triggerWords" class="translate">Trigger-Wörter (kommagetrennt)</label>
-                <span class="helper-text">z.B.: "Computer, Haus, Smart Home" (leer = alle Befehle)</span>
+                <span class="helper-text">z.B.: "Computer, Haus" (leer = alle Befehle)</span>
             </div>
         </div>
 
@@ -189,7 +302,7 @@
             <div class="input-field col s12 m6">
                 <input type="text" id="allowedRooms" class="value">
                 <label for="allowedRooms" class="translate">Erlaubte Räume (kommagetrennt)</label>
-                <span class="helper-text">Leer lassen für alle Räume, z.B.: Wohnzimmer, Küche, Schlafzimmer</span>
+                <span class="helper-text">Leer lassen für alle Räume</span>
             </div>
 
             <div class="col s12 m6">
@@ -239,20 +352,20 @@
                         <span class="card-title">Hilfe</span>
                         <p><strong>So funktioniert der Adapter:</strong></p>
                         <ol>
-                            <li>Spracheingaben von allen konfigurierten Alexa2 Instanzen werden empfangen</li>
-                            <li>Claude analysiert den Befehl und erkennt die Absicht</li>
-                            <li>Das entsprechende ioBroker-Objekt wird gesteuert</li>
+                            <li>Wähle deinen bevorzugten LLM-Provider (Claude, ChatGPT, Gemini oder Kimi)</li>
+                            <li>Gib deinen API Key ein (bekommst du auf der Provider-Website)</li>
+                            <li>Wähle die Alexa2-Instanzen die überwacht werden sollen</li>
+                            <li>Speichern und Adapter starten</li>
                         </ol>
-                        <p><strong>Beispiel-Befehle:</strong></p>
+                        <p><strong>Unterstützte Provider:</strong></p>
                         <ul>
-                            <li>"Schalte das Licht im Wohnzimmer ein"</li>
-                            <li>"Stelle die Heizung auf 22 Grad"</li>
-                            <li>"Dimme die Lampe auf 50 Prozent"</li>
+                            <li><strong>Claude (Anthropic)</strong>: Sehr gute Sprachverarbeitung</li>
+                            <li><strong>ChatGPT (OpenAI)</strong>: Schnell und zuverlässig</li>
+                            <li><strong>Gemini (Google)</strong>: Gute Performance</li>
+                            <li><strong>Kimi (Moonshot)</strong>: Starke Alternative</li>
                         </ul>
-                        <p><strong>Mehrere Alexa-Instanzen:</strong></p>
-                        <p>Halte Strg (Windows) oder Cmd (Mac) gedrückt, um mehrere Instanzen auszuwählen.</p>
                         <p><strong>Manueller Input:</strong></p>
-                        <p>Schreibe in den State <code>llm-controller.0.manualInput</code> um Befehle direkt zu senden.</p>
+                        <p>Schreibe in den State <code>llm-controller.0.manualInput</code> um Befehle direkt zu testen.</p>
                     </div>
                 </div>
             </div>

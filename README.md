@@ -3,16 +3,16 @@
 [![NPM version](https://img.shields.io/npm/v/iobroker.llm-controller.svg)](https://www.npmjs.com/package/iobroker.llm-controller)
 [![License](https://img.shields.io/npm/l/iobroker.llm-controller.svg)](https://github.com/djlex83/ioBroker.llm-controller/blob/main/LICENSE)
 
-Steuere dein Smart Home mit natürlicher Sprache! Dieser ioBroker-Adapter nutzt Claude (Anthropic) als KI, um Sprachbefehle von Alexa zu interpretieren und in Smart-Home-Aktionen umzuwandeln.
+Steuere dein Smart Home mit natürlicher Sprache! Dieser ioBroker-Adapter unterstützt mehrere KI-Anbieter (Claude, ChatGPT, Gemini, Kimi) um Sprachbefehle von Alexa zu interpretieren und in Smart-Home-Aktionen umzuwandeln.
 
 ## Features
 
+- **Multi-LLM Unterstützung**: Wähle zwischen Claude, ChatGPT, Gemini oder Kimi
 - **Natürliche Sprachverarbeitung**: Versteht komplexe Befehle wie "Mach das Licht im Wohnzimmer etwas dunkler"
 - **Multi-Alexa-Integration**: Unterstützt mehrere Alexa2-Adapter-Instanzen gleichzeitig
 - **Automatische Geräteerkennung**: Findet automatisch steuerbare Geräte in ioBroker (mit Caching)
 - **Raumbasierte Steuerung**: Unterstützt Raum-Kontext für präzisere Befehle
 - **Manuelle Eingabe**: Befehle können auch manuell per Datenpunkt gesendet werden
-- **Konfigurierbares LLM**: Wahl zwischen verschiedenen Claude-Modellen
 - **Trigger-Wörter**: Filtere Alexa-Befehle nach bestimmten Schlüsselwörtern
 - **Debouncing**: Verhindert doppelte Verarbeitung schneller Befehle
 - **Rate Limiting**: Schützt vor API-Überlastung
@@ -41,17 +41,27 @@ iobroker add llm-controller
 
 | Einstellung | Beschreibung |
 |-------------|--------------|
-| **API Key** | Dein Anthropic API Key (erforderlich) |
-| **Modell** | Claude-Modell (Standard: claude-sonnet-4-20250514) |
-| **Max Tokens** | Maximale Tokens für Claude-Antwort (Standard: 1024) |
+| **LLM Provider** | Wähle zwischen Claude, ChatGPT, Gemini oder Kimi |
+| **Modell** | Passendes Modell für den gewählten Provider |
+| **API Key** | API Key für den gewählten Provider (erforderlich) |
+| **Max Tokens** | Maximale Tokens für LLM-Antwort (Standard: 1024) |
 | **Befehls-Timeout** | Maximale Zeit für Befehlsverarbeitung in Sekunden (Standard: 30) |
-| **Alexa2 Instanzen** | Mehrere Alexa2-Adapter-Instanzen auswählbar |
+| **Alexa2 Instanzen** | Mehrere Alexa2-Adapter-Instanzen per Dropdown auswählbar |
 | **Trigger-Wörter** | Nur Befehle mit diesen Wörtern verarbeiten (optional) |
 | **Erlaubte Räume** | Optional: Beschränke Steuerung auf bestimmte Räume |
 | **Geräte-Cache** | Minuten zwischen Geräte-Updates (Standard: 5) |
 | **Debounce** | Verzögerung für schnelle Befehle in ms (Standard: 500) |
 | **Aktionen bestätigen** | Bei niedriger Konfidenz Bestätigung anfordern |
-| **System Prompt** | Optional: Eigener System-Prompt für Claude |
+| **System Prompt** | Optional: Eigener System-Prompt für das LLM |
+
+### Unterstützte LLM Provider
+
+| Provider | Modelle | API Key Quelle |
+|----------|---------|----------------|
+| **Claude (Anthropic)** | Sonnet 4, Opus 4, Haiku 3.5 | [console.anthropic.com](https://console.anthropic.com) |
+| **ChatGPT (OpenAI)** | GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 | [platform.openai.com](https://platform.openai.com) |
+| **Gemini (Google)** | Gemini 2.5 Pro, 1.5 Pro, 1.5 Flash | [ai.google.dev](https://ai.google.dev) |
+| **Kimi (Moonshot)** | Kimi K2.5, K1.5 | [platform.moonshot.cn](https://platform.moonshot.cn) |
 
 ## Verwendung
 
@@ -122,6 +132,12 @@ MIT License - siehe [LICENSE](LICENSE)
 Alexej Horner
 
 ## Changelog
+
+### 0.3.0 (Multi-LLM Support)
+- **Multi-LLM Unterstützung**: Claude, ChatGPT, Gemini und Kimi auswählbar
+- **Dynamische Modell-Auswahl**: Modelle werden je nach Provider aktualisiert
+- **Dropdown für Alexa-Instanzen**: Alle installierten Alexa2-Instanzen automatisch erkannt
+- **Unified LLM Factory**: Modularer Aufbau für einfache Erweiterung
 
 ### 0.2.0 (Optimierungen)
 - **Multi-Alexa-Support**: Mehrere Alexa2-Instanzen gleichzeitig überwachen
