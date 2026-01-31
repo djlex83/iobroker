@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "llm-controller",
-    "version": "0.3.6",
+    "version": "0.3.7",
     "news": {
+      "0.3.7": {
+        "en": "Fixed CSS - selects are now visible with !important display:block",
+        "de": "CSS repariert - Selects sind jetzt sichtbar mit !important display:block"
+      },
       "0.3.6": {
         "en": "Removed Materialize formSelect - using native HTML selects",
         "de": "Materialize formSelect entfernt - verwendet native HTML selects"

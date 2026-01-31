@@ -10,26 +10,52 @@
     <script type="text/javascript" src="../../js/translate.js"></script>
     <script type="text/javascript" src="../../js/adapter-settings.js"></script>
     <style>
-        select { 
-            display: block; 
-            width: 100%; 
-            padding: 8px; 
-            border: 1px solid #ccc; 
-            border-radius: 4px;
-            background: white;
+        /* WICHTIG: Select sichtbar machen */
+        select {
+            display: block !important;
+            width: 100%;
+            height: 40px;
+            padding: 8px 12px;
+            margin-top: 8px;
             font-size: 14px;
-            margin-top: 20px;
+            border: 1px solid #9e9e9e;
+            border-radius: 4px;
+            background-color: white;
         }
-        select[multiple] { height: auto; min-height: 80px; }
-        .input-field { margin-bottom: 20px; }
-        label { 
-            display: block; 
-            font-weight: bold; 
+        
+        select[multiple] {
+            height: 80px;
+        }
+        
+        /* Label über dem Select */
+        label {
+            display: block;
+            font-weight: bold;
             color: #555;
-            margin-bottom: 5px;
+            margin-top: 10px;
         }
-        h4 { color: #1976d2; border-bottom: 2px solid #1976d2; padding-bottom: 10px; }
-        h5 { color: #555; margin-top: 30px; }
+        
+        h4 { 
+            color: #1976d2; 
+            border-bottom: 2px solid #1976d2; 
+            padding-bottom: 10px; 
+        }
+        
+        h5 { 
+            color: #555; 
+            margin-top: 30px; 
+        }
+        
+        .input-field {
+            margin-bottom: 20px;
+        }
+        
+        /* Materialize Checkbox fix */
+        [type="checkbox"].filled-in {
+            opacity: 1;
+            position: relative;
+            margin-right: 8px;
+        }
     </style>
     <script type="text/javascript">
         console.log('=== ADMIN PAGE LOADED ===');
@@ -45,38 +71,39 @@
             try {
                 // Provider setzen
                 var provider = settings.llmProvider || 'claude';
-                $('#llmProvider').val(provider);
+                document.getElementById('llmProvider').value = provider;
                 
                 // Models laden
                 updateModels(provider, settings.model);
                 
                 // Text Felder
-                $('#apiKey').val(settings.apiKey || '');
-                $('#maxTokens').val(settings.maxTokens || 1024);
-                $('#commandTimeout').val(settings.commandTimeout || 30);
-                $('#confidenceThreshold').val(settings.confidenceThreshold || 0.5);
-                $('#deviceCacheMinutes').val(settings.deviceCacheMinutes || 5);
-                $('#debounceMs').val(settings.debounceMs || 500);
-                $('#allowedRooms').val(settings.allowedRooms || '');
-                $('#systemPrompt').val(settings.systemPrompt || '');
-                $('#confirmActions').prop('checked', settings.confirmActions || false);
+                document.getElementById('apiKey').value = settings.apiKey || '';
+                document.getElementById('maxTokens').value = settings.maxTokens || 1024;
+                document.getElementById('commandTimeout').value = settings.commandTimeout || 30;
+                document.getElementById('confidenceThreshold').value = settings.confidenceThreshold || 0.5;
+                document.getElementById('deviceCacheMinutes').value = settings.deviceCacheMinutes || 5;
+                document.getElementById('debounceMs').value = settings.debounceMs || 500;
+                document.getElementById('allowedRooms').value = settings.allowedRooms || '';
+                document.getElementById('systemPrompt').value = settings.systemPrompt || '';
+                document.getElementById('confirmActions').checked = settings.confirmActions || false;
                 
                 if (settings.triggerWords && Array.isArray(settings.triggerWords)) {
-                    $('#triggerWords').val(settings.triggerWords.join(', '));
+                    document.getElementById('triggerWords').value = settings.triggerWords.join(', ');
                 }
 
                 // Alexa Instanzen
                 loadAlexaInstances(settings.alexa2Instances || ['alexa2.0']);
 
                 // Event Handler
-                $('#llmProvider').on('change', function() {
-                    updateModels($(this).val());
+                document.getElementById('llmProvider').onchange = function() {
+                    updateModels(this.value);
                     onChange();
-                });
+                };
 
-                $('.value').on('change', function() {
-                    onChange();
-                });
+                var inputs = document.querySelectorAll('.value');
+                for (var i = 0; i < inputs.length; i++) {
+                    inputs[i].onchange = function() { onChange(); };
+                }
 
                 onChange(false);
                 console.log('=== LOAD COMPLETE ===');
@@ -114,16 +141,18 @@
             };
             
             var modelList = models[provider] || models.claude;
-            var html = '';
+            var select = document.getElementById('model');
+            select.innerHTML = '';
             
             for (var i = 0; i < modelList.length; i++) {
-                var isSelected = (modelList[i].id === selectedModel) || (!selectedModel && i === 0);
-                html += '<option value="' + modelList[i].id + '"' + (isSelected ? ' selected' : '') + '>';
-                html += modelList[i].name;
-                html += '</option>';
+                var option = document.createElement('option');
+                option.value = modelList[i].id;
+                option.text = modelList[i].name;
+                if ((modelList[i].id === selectedModel) || (!selectedModel && i === 0)) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
             }
-            
-            $('#model').html(html);
         }
 
         function loadAlexaInstances(selected) {
@@ -135,18 +164,27 @@
             }, function(err, res) {
                 console.log('Alexa response:', err, res);
                 
-                var html = '';
+                var select = document.getElementById('alexa2Instances');
+                select.innerHTML = '';
+                
                 if (!err && res && res.rows && res.rows.length > 0) {
                     for (var i = 0; i < res.rows.length; i++) {
                         var inst = res.rows[i].id.replace('system.adapter.', '');
-                        var isSelected = selected && selected.indexOf(inst) >= 0;
-                        html += '<option value="' + inst + '"' + (isSelected ? ' selected' : '') + '>' + inst + '</option>';
+                        var option = document.createElement('option');
+                        option.value = inst;
+                        option.text = inst;
+                        if (selected && selected.indexOf(inst) >= 0) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
                     }
                 } else {
-                    html = '<option value="alexa2.0" selected>alexa2.0</option>';
+                    var option = document.createElement('option');
+                    option.value = 'alexa2.0';
+                    option.text = 'alexa2.0';
+                    option.selected = true;
+                    select.appendChild(option);
                 }
-                
-                $('#alexa2Instances').html(html);
             });
         }
 
@@ -154,20 +192,28 @@
             console.log('=== SAVE CALLED ===');
             
             var obj = {};
-            obj.llmProvider = $('#llmProvider').val();
-            obj.model = $('#model').val();
-            obj.apiKey = $('#apiKey').val();
-            obj.maxTokens = parseInt($('#maxTokens').val()) || 1024;
-            obj.commandTimeout = parseInt($('#commandTimeout').val()) || 30;
-            obj.deviceCacheMinutes = parseInt($('#deviceCacheMinutes').val()) || 5;
-            obj.debounceMs = parseInt($('#debounceMs').val()) || 500;
-            obj.confidenceThreshold = parseFloat($('#confidenceThreshold').val()) || 0.5;
-            obj.allowedRooms = $('#allowedRooms').val() || '';
-            obj.systemPrompt = $('#systemPrompt').val() || '';
-            obj.confirmActions = $('#confirmActions').prop('checked');
-            obj.alexa2Instances = $('#alexa2Instances').val() || ['alexa2.0'];
+            obj.llmProvider = document.getElementById('llmProvider').value;
+            obj.model = document.getElementById('model').value;
+            obj.apiKey = document.getElementById('apiKey').value;
+            obj.maxTokens = parseInt(document.getElementById('maxTokens').value) || 1024;
+            obj.commandTimeout = parseInt(document.getElementById('commandTimeout').value) || 30;
+            obj.deviceCacheMinutes = parseInt(document.getElementById('deviceCacheMinutes').value) || 5;
+            obj.debounceMs = parseInt(document.getElementById('debounceMs').value) || 500;
+            obj.confidenceThreshold = parseFloat(document.getElementById('confidenceThreshold').value) || 0.5;
+            obj.allowedRooms = document.getElementById('allowedRooms').value || '';
+            obj.systemPrompt = document.getElementById('systemPrompt').value || '';
+            obj.confirmActions = document.getElementById('confirmActions').checked;
             
-            var tw = $('#triggerWords').val();
+            var alexaSelect = document.getElementById('alexa2Instances');
+            var alexaArr = [];
+            for (var i = 0; i < alexaSelect.options.length; i++) {
+                if (alexaSelect.options[i].selected) {
+                    alexaArr.push(alexaSelect.options[i].value);
+                }
+            }
+            obj.alexa2Instances = alexaArr.length > 0 ? alexaArr : ['alexa2.0'];
+            
+            var tw = document.getElementById('triggerWords').value;
             obj.triggerWords = tw ? tw.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; }) : [];
 
             console.log('Saving:', obj);
@@ -191,7 +237,7 @@
 
         <div class="row">
             <div class="input-field col s12 m6">
-                <label>Provider</label>
+                <label for="llmProvider">Provider</label>
                 <select id="llmProvider" class="value">
                     <option value="claude">Anthropic Claude</option>
                     <option value="openai">OpenAI (ChatGPT)</option>
@@ -201,7 +247,7 @@
             </div>
 
             <div class="input-field col s12 m6">
-                <label>Modell</label>
+                <label for="model">Modell</label>
                 <select id="model" class="value">
                     <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
                 </select>
@@ -251,7 +297,7 @@
 
         <div class="row">
             <div class="input-field col s12 m6">
-                <label>Alexa2 Instanzen (Strg+Klick für Mehrere)</label>
+                <label for="alexa2Instances">Alexa2 Instanzen (Strg+Klick für Mehrere)</label>
                 <select id="alexa2Instances" class="value" multiple size="3">
                     <option value="alexa2.0">alexa2.0</option>
                 </select>
